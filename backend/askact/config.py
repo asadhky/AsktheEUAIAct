@@ -11,8 +11,11 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-# The original Official Journal text of Regulation (EU) 2024/1689, not a consolidated version.
-DEFAULT_SOURCE_URL = "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202401689"
+# The original Official Journal text of Regulation (EU) 2024/1689 (CELEX 32024R1689), not a
+# consolidated version. This is the Publications Office's own resource URL for EUR-Lex documents.
+# The eur-lex.europa.eu HTML page is not used: it answers automated clients with a "202 Accepted"
+# bot-challenge page instead of the document (observed with this project's honest User-Agent).
+DEFAULT_SOURCE_URL = "https://publications.europa.eu/resource/celex/32024R1689"
 
 
 class ModelPrice(BaseModel):
