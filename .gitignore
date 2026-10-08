@@ -1,0 +1,27 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+dist/
+
+# Generated data (rebuild with the ingestion script)
+data/raw/
+data/index/
+
+# Editors / OS
+.idea/
+.DS_Store
+
+# Kiro local settings (may contain tokens; check the exact folder name)
+.kiro/settings/
+
