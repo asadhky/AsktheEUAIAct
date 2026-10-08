@@ -20,7 +20,7 @@ Checkboxes are ticked only after you approve the task.
 
 ## A. Foundations and retrieval (no LLM anywhere)
 
-- [ ] **Task 1 — Scaffold, config, `.env.example`, minimal CI**
+- [x] **Task 1 — Scaffold, config, `.env.example`, minimal CI**
   - *Goal:* a runnable Python 3.12 project with one source of truth for configuration.
   - *Files:* `backend/pyproject.toml` (base deps, `dev` extra, `models` extra), `backend/askact/__init__.py`, `backend/askact/config.py` (pydantic-settings; the only place env vars are read; every variable in §4, with the two relevance thresholds defaulting to `None` until tuned), pytest config with the `slow` marker, `backend/tests/test_config.py`, `.env.example` (every variable in §4 documented, including the proxy-hop assumption and the `LOG_QUESTIONS` warning), `.github/workflows/ci.yml` (backend job only: Python 3.12, `pip install -e ".[dev]"`, `pytest -m "not slow"` with stub/fake env). Extend `.gitignore` only if something new needs ignoring.
   - *Tests:* defaults load; env overrides work; invalid values (negative cap, bad JSON price table) raise clear errors; thresholds are `None` when unset; `.env.example` lists exactly the variables `config.py` defines (a test compares the two).
