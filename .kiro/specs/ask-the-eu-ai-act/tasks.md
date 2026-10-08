@@ -27,7 +27,7 @@ Checkboxes are ticked only after you approve the task.
   - *Covers:* R6.13 (initial), R6.4 (backend half), `rules.md` config/secrets rules.
   - *Review focus:* the variable list and defaults in §4; CI file.
 
-- [ ] **Task 2 — Section ids and data models**
+- [x] **Task 2 — Section ids and data models**
   - *Goal:* the shared vocabulary every later module uses.
   - *Files:* `backend/askact/models.py` (`SectionId` parse/format/normalise, `Chunk`, `ScoredChunk`, `RetrievalResult`), `backend/tests/test_models.py`.
   - *Tests:* `article:5`, `recital:12`, `annex:III` round-trip; normalisation of messy forms (`Article 5`, `annex:iii`, whitespace); rejection of invalid ids; chunk-id format `article:5#2`; a chunk exposes its parent section id.
@@ -202,7 +202,7 @@ Checkboxes are ticked only after you approve the task.
 - [ ] **Task 24 — README**
   - *Goal:* the front door of the project.
   - *Files:* `README.md`.
-  - *Content:* architecture diagram (from §1); quick start; configuration pointer to `.env.example`, including the build-time `NEXT_PUBLIC_API_URL` note; the results table pasted from `eval/results.md` (never typed); question counts per split; a statement that the questions were hand-written; a note that small samples mean differences between configs may be noise; the **backend image size and idle memory use** exactly as measured in Task 22, with the measurement method, date and the settings used (or "not measured" if Task 22 could not measure them); the optional manual faithfulness review (N reviewed, how many faithful) only if you actually did one; a limitations section: single pinned document, English Official Journal text only, later amendments not reflected and naming Regulation (EU) 2026/1744, retrieval/parsing limits, not legal advice, single worker, non-goals.
+  - *Content:* architecture diagram (from §1); quick start; configuration pointer to `.env.example`, including the build-time `NEXT_PUBLIC_API_URL` note; the results table pasted from `eval/results.md` (never typed); question counts per split; a statement that the questions were hand-written; a note that small samples mean differences between configs may be noise; the **backend image size and idle memory use** exactly as measured in Task 22, with the measurement method, date and the settings used (or "not measured" if Task 22 could not measure them); the optional manual faithfulness review (N reviewed, how many faithful) only if you actually did one; a limitations section: single pinned document, English Official Journal text only (the HTML rendition, which EUR-Lex says is for information and not the authentic signed PDF), later amendments not reflected and naming Regulation (EU) 2026/1744, retrieval/parsing limits, not legal advice, single worker, non-goals.
   - *Covers:* R7.1–R7.6, R5.12.
 
 ---
