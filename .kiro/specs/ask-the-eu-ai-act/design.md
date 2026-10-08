@@ -106,8 +106,8 @@ For BM25 and embeddings the indexed string is `"Article 5 — Prohibited AI prac
 
 `python -m askact.ingest [--force] [--source-file PATH]`
 
-1. **Fetch** — if `data/raw/ai-act-oj-2024-1689.html` exists and `--force` is not set, reuse it. Otherwise GET `SOURCE_URL` (default: `https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202401689`) with `httpx`, a descriptive `User-Agent`, and a timeout.
-2. **Fallback** — if the fetch fails, or the response does not pass validation, load the manually downloaded file: `--source-file` if given, otherwise `SOURCE_FALLBACK_PATH`, which defaults to `data/raw/ai-act-oj-2024-1689.manual.html` (a different name from the cache file so a fetch never overwrites it). This makes the build work offline and is the escape hatch if EUR-Lex starts challenging automated clients. If neither works: print the error, exit non-zero, and write nothing (R1.13).
+1. **Fetch** — if `data/raw/ai-act-oj-2024-1689.html` exists and `--force` is not set, reuse it. Otherwise GET `SOURCE_URL` with `httpx`, a descriptive `User-Agent`, and a timeout. The default is the Publications Office resource URL `https://publications.europa.eu/resource/celex/32024R1689`, requested with `Accept: application/xhtml+xml` and `Accept-Language: eng` (the document variant is chosen by content negotiation). The `eur-lex.europa.eu/legal-content/…` HTML page that this design first assumed answers the project's honest User-Agent with a `202 Accepted` bot-challenge page (observed in Task 3), and the project does not impersonate a browser to get around that. A response only counts as the document if the status is exactly 200 and the body contains the Official Journal id `L_202401689EN`; a cached file that fails the same check is ignored and fetched again. EUR-Lex states that the authentic Official Journal is the signed PDF and that the HTML rendition is for information only, so the README limitations say that this app parses the HTML rendition.
+2. **Fallback** — if the fetch fails, or the response does not pass validation, load the manually downloaded file: `--source-file` if given, otherwise `SOURCE_FALLBACK_PATH`, which defaults to `data/raw/ai-act-oj-2024-1689.manual.html` (a different name from the cache file so a fetch never overwrites it). This makes the build work offline and is the escape hatch if the source starts challenging automated clients (as `eur-lex.europa.eu` already does). If neither works: print the error, exit non-zero, and write nothing (R1.13).
 3. **Pin check** — the document `<title>` must start with `L_202401689EN` (the Official Journal file id, as opposed to a consolidated `02024R1689-…` document), and parsed counts must equal `EXPECTED_COUNTS` (see below). Any mismatch aborts the build. This keeps the "original text of 12 July 2024" claim in R1.2 and R4.6 honest.
 4. **Parse** (BeautifulSoup + lxml). Observed in a probe of the live page, to be confirmed by the parser task:
 
@@ -284,7 +284,7 @@ volumes: { state: {} }
 
 | variable | default | purpose |
 |---|---|---|
-| `SOURCE_URL` | EUR-Lex OJ URL (§3.1) | where ingestion fetches |
+| `SOURCE_URL` | `https://publications.europa.eu/resource/celex/32024R1689` (§3.1) | where ingestion fetches |
 | `SOURCE_FALLBACK_PATH` | `data/raw/ai-act-oj-2024-1689.manual.html` | manually downloaded copy, used if the fetch fails |
 | `CHUNK_MAX_CHARS` | 1800 | chunk size bound |
 | `EMBEDDING_MODEL` / `RERANKER_MODEL` | see §3.2 | local models |
