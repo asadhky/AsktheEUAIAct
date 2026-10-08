@@ -9,6 +9,8 @@ description = "Ask the EU AI Act: a small RAG app with citations"
 requires-python = ">=3.12"
 # Runtime dependencies are added by the task that first uses them, so nothing sits here unused.
 dependencies = [
+    # Tested clean from 0.23.3 to 0.28.1 (0.22.0 passes with a warning; older versions are untested).
+    "httpx>=0.23",
     # 2.7 is the oldest release that has `NoDecode` (tested: 2.6.1 fails to import it, 2.7.0 passes).
     "pydantic-settings>=2.7",
 ]
