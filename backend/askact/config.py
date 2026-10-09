@@ -40,7 +40,8 @@ class Settings(BaseSettings):
     # Used when the fetch fails. A different name from the cached download, so a fetch
     # can never overwrite a manually downloaded copy.
     source_fallback_path: Path = Path("data/raw/ai-act-oj-2024-1689.manual.html")
-    # A starting value: a character count is only a proxy for the embedder's token limit.
+    # Characters are only a proxy for the embedder's token limit. 1800 was checked against the
+    # default model by the slow test tests/ingest/test_chunk_tokens.py (longest chunk: 499 of 512 tokens).
     chunk_max_chars: int = Field(1800, gt=0)
 
     # --- Retrieval ---

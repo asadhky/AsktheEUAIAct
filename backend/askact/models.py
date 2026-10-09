@@ -109,6 +109,22 @@ class Chunk(BaseModel):
             raise ValueError("chunk text must not be blank")
         return value
 
+    @property
+    def header(self) -> str:
+        """'Article 5 — Prohibited AI practices', or just 'Recital 12' (recitals have no title)."""
+        label = self.section_id.label
+        return f"{label} — {self.title}" if self.title else label
+
+    @property
+    def embed_text(self) -> str:
+        """The string that is embedded and BM25-indexed: the header, then the text.
+
+        The header gives every chunk its context ("Article 5, Prohibited AI practices") even when a
+        long article is split. It is not part of `text`, so the sources panel stays clean. This is
+        the one place the string is built; the chunker sizes chunks against it, and retrieval indexes it.
+        """
+        return f"{self.header}\n{self.text}"
+
     # Derived rather than stored, so they can never disagree with section_id and ordinal.
     # They are still written to chunks.jsonl, which keeps the file readable on its own.
     @computed_field
