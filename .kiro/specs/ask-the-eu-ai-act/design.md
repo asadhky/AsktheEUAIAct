@@ -147,7 +147,7 @@ class Retriever:
 ```
 
 - **bm25**: `rank_bm25.BM25Okapi` over lowercase word tokens of the header-prefixed text (no stemming; simple and predictable for legal terms).
-- **dense**: embed the query, then score `embeddings @ q` (cosine, since both are normalised). For the BGE model the query gets the model's recommended retrieval instruction prefix.
+- **dense**: embed the query, then score `embeddings @ q` (cosine, since both are normalised). For the BGE v1.5 models the query gets the retrieval instruction `Represent this sentence for searching relevant passages: ` (the string is from the model card, which also says documents never get it). The model card calls the instruction *optional* for v1.5 (omitting it costs only "a slight degradation") but recommends it for short queries against long passages, which is this app; it also says to choose by performance on your own task. So it is on by default, and whether it helps here is a question for the retrieval evaluation. It is applied only to models whose card was checked: any other `EMBEDDING_MODEL` is embedded without an instruction and a warning is logged, rather than being given the wrong one. The model ships no prompt of its own (its `config_sentence_transformers.json` has none), so the string lives in `embedders.py`.
 - **hybrid**: take the top `CANDIDATES` (default 30) from each ranker and fuse with **Reciprocal Rank Fusion**, `score = Σ 1/(60 + rank)`. RRF uses ranks only, so BM25 and cosine scores never need to be put on one scale (R2.3).
 - **hybrid+rerank**: rerank the top `RERANK_CANDIDATES` (default 20) fused candidates with a cross-encoder and return the top k. With `RERANKER_ENABLED=false` the reranker is never loaded or called (R2.4). The app's config is `hybrid+rerank` if the flag is on, else `hybrid`; the eval harness iterates all four.
 - **Relevance score** (R3.7/R3.8), attached to every result:
@@ -155,7 +155,8 @@ class Retriever:
   - every other config → `cosine(query, rank-1 chunk)`, computed for all of them including `bm25` and `hybrid` (`relevance_kind="cosine"`). So `bm25` still loads the embedder at query time; that is the price of one comparable gate across configs.
 - **Models** (env-configurable, defaults are my picks and unverified until the eval runs): embedder `BAAI/bge-small-en-v1.5` (small, CPU-friendly, 512-token window); reranker `cross-encoder/ms-marco-MiniLM-L-6-v2` (small and fast on CPU). Both are loaded through `sentence-transformers`.
 - **Stubs (CI, R6.4):**
-  - `HashEmbedder`: tokens hashed into a fixed number of buckets, counted and L2-normalised. Deterministic, no download, and cosine still reflects word overlap, so tests can assert sensible ordering.
+  - `HashEmbedder`: lower-cased word tokens hashed into 256 buckets with `hashlib.blake2b` (not `hash()`, which Python randomises per process), counted and L2-normalised. Deterministic across processes, no download, never imports torch, and cosine grows with the words two texts share (and with repetition), so tests can assert sensible ordering. Text with no word characters has no direction and maps to the zero vector. Its `name` includes its dimension, because the name goes into the index build hash.
+  - The real `SentenceTransformerEmbedder` runs on the CPU, returns float32 unit vectors, and reads its dimension from the model (384 for the default). Both embedders implement `embed_documents(texts)` and `embed_query(text)`; documents never get the query instruction.
   - `OverlapReranker`: score = Jaccard overlap of query/passage tokens.
   - Selected by `EMBEDDER=stub|real` and `RERANKER=stub|real` (default `real`; tests and CI set `stub`).
 
@@ -422,6 +423,7 @@ No test asserts retrieval *quality* on the real Act; that is the harness's job, 
 6. **Single worker.** The in-process rate limiter forces one uvicorn worker. That is fine for a demo and is stated in the README limitations.
 7. **`LOG_QUESTIONS`** (§3.4) is the one opt-in I added to make "no question text by default" meaningful. If you would rather never log questions at all, delete that variable and the matching test row.
 8. **Logging is not in `requirements.md`.** It is a design-level decision; say so if you want a requirement added for it.
+9. **The BGE query instruction is a retrieval setting to decide by evidence** (§3.2): on by default, optional per the model card. Task 10 evaluates retrieval; if it matters, we compare with and without it on the dev split before choosing. Today it can only be changed in code (`query_prefix=""`), not by an environment variable, because no requirement or design table asks for one.
 
 ---
 
