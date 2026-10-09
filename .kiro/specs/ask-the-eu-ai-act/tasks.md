@@ -33,7 +33,7 @@ Checkboxes are ticked only after you approve the task.
   - *Tests:* `article:5`, `recital:12`, `annex:III` round-trip; normalisation of messy forms (`Article 5`, `annex:iii`, whitespace); rejection of invalid ids; chunk-id format `article:5#2`; a chunk exposes its parent section id.
   - *Covers:* R1.8 (metadata shape), supports R3.5 and R5.3.
 
-- [ ] **Task 3 — Ingestion: fetch, cache, fallback**
+- [x] **Task 3 — Ingestion: fetch, cache, fallback**
   - *Goal:* get the source file onto disk, or fail clearly.
   - *Files:* `backend/askact/ingest/fetch.py`, `backend/tests/ingest/test_fetch.py`.
   - *Behaviour:* reuse `data/raw/ai-act-oj-2024-1689.html` unless `--force`; otherwise GET `SOURCE_URL` with `httpx` (descriptive User-Agent, timeout); on failure or an invalid response, use the manually downloaded file: `--source-file` if given, otherwise `SOURCE_FALLBACK_PATH`, which defaults to `data/raw/ai-act-oj-2024-1689.manual.html` (a different name from the cache file, so a fetch can never overwrite a manual download); if neither works, raise an error that the CLI turns into a non-zero exit with nothing written. Return the file path and its `sha256`.
