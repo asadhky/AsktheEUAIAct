@@ -17,6 +17,7 @@ from askact.embedders import (
     HashEmbedder,
     SentenceTransformerEmbedder,
     default_query_prefix,
+    embedder_name,
     get_embedder,
 )
 from askact.ingest.chunk import chunk_act
@@ -197,6 +198,21 @@ def test_real_is_the_default_choice(monkeypatch):
     assert Settings(_env_file=None).embedder == "real"
     get_embedder(Settings(_env_file=None, embedding_model="some/model"))
     assert seen["model"] == "some/model"
+
+
+def test_the_embedder_name_is_known_without_loading_a_model(monkeypatch):
+    """Index staleness is decided from the name alone; loading the real model takes seconds."""
+    def explode(*args, **kwargs):
+        raise AssertionError("no model may be loaded just to learn a name")
+
+    monkeypatch.setattr(embedders, "SentenceTransformerEmbedder", explode)
+    assert embedder_name(Settings(_env_file=None, embedder="real", embedding_model="some/model")) == "some/model"
+    assert embedder_name(Settings(_env_file=None, embedder="stub")) == HashEmbedder().name
+
+
+def test_the_embedder_name_matches_the_name_of_the_embedder_it_describes():
+    settings = Settings(_env_file=None, embedder="stub")
+    assert embedder_name(settings) == get_embedder(settings).name
 
 
 # --- the real embedder's failure modes, without needing the model ----------------------------------------

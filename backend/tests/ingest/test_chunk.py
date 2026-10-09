@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from askact.ingest.chunk import MIN_TEXT_ROOM, ChunkError, chunk_act, chunk_section
+from askact.ingest.chunk import CHUNKER_VERSION, MIN_TEXT_ROOM, ChunkError, chunk_act, chunk_section, chunking_params
 from askact.ingest.parse import ParsedAct, Section, parse_act
 from askact.models import Chunk, SectionId
 
@@ -185,6 +185,26 @@ def test_the_limit_applies_to_header_plus_text_so_a_long_annex_title_leaves_less
     assert_sound(section, chunks, 500)
     assert max(len(c.embed_text) for c in chunks) <= 500
     assert max(len(c.text) for c in chunks) <= 500 - len(chunks[0].header) - 1
+
+
+# --- the chunker version is part of the index hash ------------------------------------------------------
+
+def test_the_chunking_parameters_are_the_size_limit_and_the_chunker_version():
+    from askact.config import Settings
+
+    params = chunking_params(Settings(_env_file=None, chunk_max_chars=900))
+    assert params == {"max_chars": 900, "chunker_version": CHUNKER_VERSION}
+
+
+def test_the_chunker_version_matches_the_chunks_it_produces(mini):
+    """If this fails, the chunker's output changed. Bump CHUNKER_VERSION in ingest/chunk.py (so an
+    index built by the old code is seen as stale, not silently mixed with the new), then update both
+    values here. Changing the digest without bumping the version defeats the purpose."""
+    import hashlib
+
+    chunks = chunk_act(mini, MAX)
+    digest = hashlib.sha256("\n".join(f"{c.chunk_id}\n{c.embed_text}" for c in chunks).encode()).hexdigest()
+    assert (CHUNKER_VERSION, digest) == (1, "bcf2cff5439a2d44966941d49f7f2bc7d08669fd41e9948488295f80b45e904d")
 
 
 # --- stable ids and determinism ---------------------------------------------------------------------

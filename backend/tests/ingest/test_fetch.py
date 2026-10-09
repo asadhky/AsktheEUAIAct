@@ -105,6 +105,12 @@ def test_request_identifies_the_client_and_sets_timeouts(raw, manual):
     assert timeout["connect"] == 10.0 and timeout["read"] == 30.0
 
 
+def test_the_downloaded_file_is_readable_by_other_users(raw, manual):
+    """mkstemp makes files private (0600); the app may run as a different user from the build."""
+    source = get_source(settings(manual), raw_dir=raw, client=Server(ok()).client)
+    assert source.path.stat().st_mode & 0o777 == 0o644
+
+
 def test_a_cached_copy_is_reused_without_any_request(raw, manual):
     raw.mkdir()
     (raw / CACHE_FILENAME).write_bytes(GOOD)
