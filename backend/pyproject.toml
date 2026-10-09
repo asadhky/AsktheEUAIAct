@@ -25,7 +25,10 @@ dev = [
 ]
 # Real local embedding/reranker models (pulls torch). Not needed for tests or CI, which use stubs.
 models = [
-    "sentence-transformers",
+    # The slow token-length test gives identical results on 3.4.1, 5.1.0 and 6.1.0 (older is untested).
+    # Install torch's CPU wheel first to avoid pulling gigabytes of GPU libraries:
+    #   pip install torch --index-url https://download.pytorch.org/whl/cpu
+    "sentence-transformers>=3.4.1",
 ]
 
 [tool.setuptools.packages.find]
