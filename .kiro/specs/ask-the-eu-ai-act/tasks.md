@@ -69,7 +69,7 @@ Checkboxes are ticked only after you approve the task.
   - *Real-file step:* run the CLI on the real source with the real model and report the printed counts and chunk total.
   - *Covers:* R1.5 (recording), R1.10, R1.13, R2.6, R2.7, R2.8.
 
-- [ ] **Task 8 — Retrieval: BM25, dense, RRF hybrid**
+- [x] **Task 8 — Retrieval: BM25, dense, RRF hybrid**
   - *Goal:* three of the four retrieval configs.
   - *Files:* `backend/askact/retrieval.py` (`Retriever.search(query, config, k)`), `backend/tests/test_retrieval.py`.
   - *Behaviour:* BM25Okapi over lowercase word tokens of the embed string; dense = `embeddings @ q`; hybrid = RRF (k=60) over the top `CANDIDATES` of each; results carry scores and full citation metadata including the parent section id.
@@ -80,7 +80,8 @@ Checkboxes are ticked only after you approve the task.
   - *Goal:* the fourth config and the score the relevance gate will use.
   - *Files:* `backend/askact/rerankers.py` (`OverlapReranker` stub, cross-encoder real, selected by `RERANKER`), updates to `retrieval.py`, tests.
   - *Behaviour:* `hybrid+rerank` reranks the top `RERANK_CANDIDATES` fused candidates; with `RERANKER_ENABLED=false` the reranker is never loaded or called; every result carries `relevance` and `relevance_kind`: the reranker score of rank 1 for `hybrid+rerank`. (The dense-cosine case for `bm25`, `dense` and `hybrid` was implemented in Task 8, because `RetrievalResult` requires the field; this task adds the `rerank` case and extends `Config` and `CONFIGS` to include `hybrid+rerank`.)
-  - *Tests:* reranker order applied and not called when disabled (spy); `relevance_kind` is `cosine` for `bm25`/`dense`/`hybrid` and `rerank` for `hybrid+rerank`; cosine for a `bm25` result is computed from the embedder, not from the BM25 score; a `slow` test runs the real reranker on the fixture.
+  - *Also in this task:* `tokenize` moved from `retrieval.py` to `models.py` (still importable from `retrieval`), because the stub reranker needed it and it was already shared by BM25 and the stub embedder; `app_config(settings)` maps `RERANKER_ENABLED` to the config the app serves; the eval harness (Task 11) must build its `Retriever` with a reranker explicitly, since it runs all four configs whatever the flag says. Details in design §3.2.
+  - *Tests:* reranker order applied and not called when disabled (spy); `relevance_kind` is `cosine` for `bm25`/`dense`/`hybrid` and `rerank` for `hybrid+rerank`; cosine for a `bm25` result is computed from the embedder, not from the BM25 score; a bad reranker output (wrong count, NaN) is an error; `slow` tests run the real reranker and pin that its scores are logits.
   - *Covers:* R2.4, R2.5 (all four configs), R3.8 (score definition).
 
 ---
