@@ -18,6 +18,8 @@ dependencies = [
     # The embedders return numpy arrays, and the stub is built on it. Declared here because the
     # `models` extra (which also brings numpy) is not installed in CI. Tested from 1.26.4 to 2.5.3.
     "numpy>=1.26.4",
+    # BM25 for the lexical half of retrieval. 0.2.2 (2022) is the newest release and the only one tested.
+    "rank-bm25>=0.2.2",
     # 2.7 is the oldest release that has `NoDecode` (tested: 2.6.1 fails to import it, 2.7.0 passes).
     "pydantic-settings>=2.7",
 ]
