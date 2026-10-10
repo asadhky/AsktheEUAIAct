@@ -336,6 +336,18 @@ def test_verify_uses_the_pinned_counts_by_default(monkeypatch):
         verify(parse_act(doc(article(1, "A", ""))))
 
 
+def test_the_count_check_and_the_numbering_check_are_separate_and_verify_runs_both():
+    """A trimmed document (real ids 1, 8, 23) can satisfy the counts but not the numbering."""
+    trimmed = parse_act(doc(article(1, "A", ""), article(3, "C", "")))
+    parse.verify_counts(trimmed, Counts(0, 2, 0))               # right number of articles: fine
+    with pytest.raises(ParseError, match="found 3 where 2 was expected"):
+        parse.verify_numbering(trimmed)                          # but 1, 3 has a gap
+    with pytest.raises(ParseError, match="found 3 where 2 was expected"):
+        verify(trimmed, Counts(0, 2, 0))                         # verify = both checks
+    with pytest.raises(ParseError, match="parsed 0 recitals, 2 articles"):
+        verify(parse_act(doc(article(1, "A", ""), article(2, "B", ""))), Counts(0, 3, 0))
+
+
 # --- the pin check also applies to a manually downloaded file (R1.4, R1.5) -------------------------
 
 def manual_source(tmp_path: Path, content: bytes):

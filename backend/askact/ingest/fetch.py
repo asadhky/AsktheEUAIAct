@@ -95,6 +95,9 @@ def _save(data: bytes, directory: Path) -> Path:
     try:
         with os.fdopen(fd, "wb") as tmp:
             tmp.write(data)
+        # mkstemp creates the file private (0600). It is a public document that the app's user
+        # may need to read, so make it readable by everyone, as a downloaded file normally would be.
+        os.chmod(tmp_name, 0o644)
         os.replace(tmp_name, target)
     except BaseException:
         Path(tmp_name).unlink(missing_ok=True)

@@ -150,6 +150,15 @@ class SentenceTransformerEmbedder:
         return self._encode([self.query_prefix + text])[0]
 
 
+def embedder_name(settings: Settings) -> str:
+    """The `name` that `get_embedder(settings)` would have, without loading a model.
+
+    Checking whether an index is stale needs only the name (it is part of the build hash), and
+    loading the real model takes seconds.
+    """
+    return HashEmbedder().name if settings.embedder == "stub" else settings.embedding_model
+
+
 def get_embedder(settings: Settings) -> Embedder:
     """The embedder chosen by EMBEDDER: the stub, or the real local model named by EMBEDDING_MODEL."""
     if settings.embedder == "stub":
