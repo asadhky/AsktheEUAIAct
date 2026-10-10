@@ -20,12 +20,23 @@ from askact.index import (
 from askact.ingest.chunk import chunk_act, chunking_params
 from askact.ingest.parse import parse_act
 from askact.models import Chunk, SectionId
-from askact.retrieval import CONFIGS, HYBRID_CANDIDATES, RRF_K, Config, Retriever, rrf, tokenize
+from askact.rerankers import RerankerError
+from askact.retrieval import (
+    CONFIGS,
+    HYBRID_CANDIDATES,
+    RERANK_CANDIDATES,
+    RRF_K,
+    Config,
+    Retriever,
+    app_config,
+    rrf,
+    tokenize,
+)
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "mini_act.html"
 REAL = Path(__file__).resolve().parents[2] / "data" / "raw" / "ai-act-oj-2024-1689.html"
 SHA = "c" * 64
-ALL: list[Config] = ["bm25", "dense", "hybrid"]
+NON_RERANK: list[Config] = ["bm25", "dense", "hybrid"]
 
 
 # --- helpers ----------------------------------------------------------------------------------------
@@ -355,15 +366,243 @@ def test_hybrid_scores_are_descending(retriever):
     assert scores == sorted(scores, reverse=True)
 
 
+# --- reranking (R2.4) ------------------------------------------------------------------------------------------------------------
+
+class SpyReranker:
+    """Scores passages by a lookup, and records every call so tests can see when it is (not) used."""
+
+    name = "spy"
+
+    def __init__(self, by_word: dict[str, float] | None = None, default: float = 0.0):
+        self.by_word, self.default = by_word or {}, default
+        self.calls: list[tuple[str, list[str]]] = []
+
+    def score(self, query, passages):
+        self.calls.append((query, list(passages)))
+        # The longest matching key wins, so "zeta alpha" is not shadowed by its substring "alpha".
+        return [
+            self.by_word[max((w for w in self.by_word if w in p), key=len)] if any(w in p for w in self.by_word) else self.default
+            for p in passages
+        ]
+
+
+def reranked_retriever(reranker, **kwargs) -> tuple[Retriever, list[Chunk]]:
+    """The scripted corpus (hybrid order for 'zeta': d2, d1, d0, d3, then fillers) with a reranker attached."""
+    base, chunks = scripted_retriever()
+    return Retriever(base._index, base._embedder, reranker, **kwargs), chunks
+
+
+def test_the_reranker_decides_the_final_order_not_the_fusion():
+    """Hybrid order is d2 d1 d0 d3. This reranker prefers d3, then d0, then d1, then d2: the reverse."""
+    reranker = SpyReranker({"beta": 9.0, "alpha": 5.0, "zeta alpha": 3.0, "zeta zeta zeta": 1.0})
+    retriever, chunks = reranked_retriever(reranker)
+    fused = ids(retriever.search("zeta", "hybrid", k=4))
+    result = retriever.search("zeta", "hybrid+rerank", k=4)
+    assert fused == [chunks[2].chunk_id, chunks[1].chunk_id, chunks[0].chunk_id, chunks[3].chunk_id]
+    assert ids(result) == [chunks[3].chunk_id, chunks[0].chunk_id, chunks[1].chunk_id, chunks[2].chunk_id]
+
+
+def test_the_scores_of_a_reranked_result_are_the_rerankers_own():
+    retriever, chunks = reranked_retriever(SpyReranker({"beta": 9.0, "alpha": 5.0, "zeta alpha": 3.0, "zeta zeta zeta": 1.0}))
+    result = retriever.search("zeta", "hybrid+rerank", k=4)
+    assert [s.score for s in result.chunks] == [9.0, 5.0, 3.0, 1.0]
+
+
+def test_the_relevance_of_a_reranked_result_is_the_top_rerank_score_and_says_so():
+    retriever, _ = reranked_retriever(SpyReranker({"beta": 9.0, "alpha": 5.0}))
+    result = retriever.search("zeta", "hybrid+rerank", k=3)
+    assert result.relevance == 9.0 and result.relevance_kind == "rerank"
+    assert result.relevance == result.chunks[0].score
+
+
+def test_a_rerank_relevance_can_be_negative_like_a_cross_encoder_logit():
+    retriever, _ = reranked_retriever(SpyReranker(default=-11.0))
+    result = retriever.search("zeta", "hybrid+rerank", k=2)
+    assert result.relevance == -11.0 and result.relevance_kind == "rerank"
+
+
+@pytest.mark.parametrize("config", NON_RERANK)
+def test_the_other_configs_still_use_the_cosine_even_when_a_reranker_is_attached(config):
+    retriever, _ = reranked_retriever(SpyReranker(default=7.0))
+    result = retriever.search("zeta", config, k=2)
+    assert result.relevance_kind == "cosine" and result.relevance != 7.0
+
+
+@pytest.mark.parametrize("config", NON_RERANK)
+def test_the_reranker_is_never_called_for_the_other_configs(config):
+    """R2.4: when not reranking, the reranker is skipped entirely."""
+    spy = SpyReranker()
+    retriever, _ = reranked_retriever(spy)
+    retriever.search("zeta", config, k=3)
+    assert spy.calls == []
+
+
+def test_the_reranker_is_called_once_per_search_with_the_question_and_the_candidates():
+    spy = SpyReranker()
+    retriever, chunks = reranked_retriever(spy)
+    retriever.search("zeta", "hybrid+rerank", k=3)
+    assert len(spy.calls) == 1
+    query, passages = spy.calls[0]
+    assert query == "zeta"
+    assert passages[0] == chunks[2].embed_text            # the best fused candidate comes first
+    assert passages[:3] == [chunks[i].embed_text for i in (2, 1, 0)]
+
+
+def test_the_reranker_reads_the_header_too_not_just_the_body():
+    spy = SpyReranker()
+    chunks = [chunk("article:99", "Member States shall lay down rules.", "Penalties")] + [
+        chunk(f"recital:{n}", f"filler{n} padding") for n in range(1, 8)
+    ]
+    embedder = HashEmbedder(dimension=1024)
+    Retriever(make_index(chunks, embedder), embedder, spy).search("penalties", "hybrid+rerank", k=1)
+    assert any(p.startswith("Article 99 — Penalties\n") for p in spy.calls[0][1])
+
+
+def test_only_the_top_rerank_candidates_are_reranked():
+    """With 3 candidates the reranker sees just the 3 best fused chunks, even though there are ten chunks."""
+    spy = SpyReranker()
+    retriever, chunks = reranked_retriever(spy, rerank_candidates=3)
+    retriever.search("zeta", "hybrid+rerank", k=2)
+    assert [p for p in spy.calls[0][1]] == [chunks[i].embed_text for i in (2, 1, 0)]
+
+
+def test_a_chunk_outside_the_rerank_candidates_cannot_win_however_the_reranker_would_score_it():
+    retriever, chunks = reranked_retriever(SpyReranker({"beta": 99.0}), rerank_candidates=3)   # d3 would win, but is 4th
+    assert chunks[3].chunk_id not in ids(retriever.search("zeta", "hybrid+rerank", k=3))
+
+
+def test_enough_candidates_are_reranked_to_return_k_even_if_rerank_candidates_is_small():
+    spy = SpyReranker()
+    retriever, _ = reranked_retriever(spy, rerank_candidates=2)
+    assert len(retriever.search("zeta", "hybrid+rerank", k=5).chunks) == 5
+    assert len(spy.calls[0][1]) == 5
+
+
+def test_the_default_number_of_rerank_candidates_is_twenty():
+    spy = SpyReranker()
+    retriever, _ = reranked_retriever(spy)      # the scripted index has only ten chunks
+    retriever.search("zeta", "hybrid+rerank", k=1)
+    assert len(spy.calls[0][1]) == 10 and RERANK_CANDIDATES == 20
+    chunks = [chunk(f"recital:{n}", f"word{n} common") for n in range(1, 41)]
+    embedder = HashEmbedder(dimension=1024)
+    spy2 = SpyReranker()
+    Retriever(make_index(chunks, embedder), embedder, spy2).search("common", "hybrid+rerank", k=1)
+    assert len(spy2.calls[0][1]) == 20
+
+
+def test_chunks_the_reranker_scores_equally_keep_their_fused_order():
+    retriever, chunks = reranked_retriever(SpyReranker(default=1.0))
+    result = retriever.search("zeta", "hybrid+rerank", k=4)
+    assert ids(result) == ids(retriever.search("zeta", "hybrid", k=4))
+
+
+def test_a_reranked_result_has_distinct_chunks_and_k_of_them():
+    retriever, _ = reranked_retriever(SpyReranker({"zeta": 1.0}))
+    result = retriever.search("zeta", "hybrid+rerank", k=5)
+    assert len(result.chunks) == 5 and len(set(ids(result))) == 5
+
+
+def test_a_reranker_that_returns_the_wrong_number_of_scores_is_an_error():
+    class Short(SpyReranker):
+        def score(self, query, passages):
+            return [1.0]
+
+    retriever, _ = reranked_retriever(Short())
+    with pytest.raises(RerankerError, match="returned 1 scores for"):
+        retriever.search("zeta", "hybrid+rerank", k=3)
+
+
+def test_a_reranker_that_returns_nan_is_an_error_and_not_a_result():
+    class Nan(SpyReranker):
+        def score(self, query, passages):
+            return [float("nan")] * len(passages)
+
+    retriever, _ = reranked_retriever(Nan())
+    with pytest.raises(RerankerError, match="not a finite number"):
+        retriever.search("zeta", "hybrid+rerank", k=3)
+
+
+def test_a_reranked_search_validates_its_input_before_calling_the_reranker():
+    spy = SpyReranker()
+    retriever, _ = reranked_retriever(spy)
+    for query, k in (("", 3), ("   ", 3), ("zeta", 0)):
+        with pytest.raises(ValueError):
+            retriever.search(query, "hybrid+rerank", k=k)
+    assert spy.calls == []
+
+
+def test_rerank_candidates_must_be_positive(stub):
+    with pytest.raises(ValueError, match="candidates must be at least 1"):
+        Retriever(make_index(CORPUS, stub), stub, SpyReranker(), rerank_candidates=0)
+
+
+# --- the flag: RERANKER_ENABLED (R2.4) -----------------------------------------------------------------------------------------------
+
+def test_the_app_uses_plain_hybrid_unless_reranking_is_enabled():
+    assert app_config(Settings(_env_file=None, reranker_enabled=False)) == "hybrid"
+    assert app_config(Settings(_env_file=None, reranker_enabled=True)) == "hybrid+rerank"
+    assert app_config(Settings(_env_file=None)) == "hybrid"          # off by default
+
+
+def test_with_the_flag_off_the_reranker_is_never_constructed(tmp_path, monkeypatch):
+    """Not loaded, not downloaded, not held in memory: get_reranker must not even be called."""
+    from askact import retrieval
+
+    def explode(settings):
+        raise AssertionError("the reranker must not be constructed when RERANKER_ENABLED is false")
+
+    monkeypatch.setattr(retrieval, "get_reranker", explode)
+    settings = write_stub_index(tmp_path / "index", CORPUS)
+    retriever = Retriever.from_settings(settings, tmp_path / "index")
+    assert sections(retriever.search("penalties", "hybrid", k=2))[0] == "article:99"
+    with pytest.raises(ValueError, match="needs a reranker"):
+        retriever.search("penalties", "hybrid+rerank", k=2)
+
+
+def test_with_the_flag_on_the_reranker_is_constructed_from_the_settings(tmp_path, monkeypatch):
+    from askact import retrieval
+
+    built = []
+    spy = SpyReranker({"penalties": 5.0})
+
+    def make(settings):
+        built.append(settings.reranker_model)
+        return spy
+
+    monkeypatch.setattr(retrieval, "get_reranker", make)
+    base = write_stub_index(tmp_path / "index", CORPUS)
+    settings = base.model_copy(update={"reranker_enabled": True, "reranker_model": "some/cross-encoder"})
+    retriever = Retriever.from_settings(settings, tmp_path / "index")
+    result = retriever.search("penalties", "hybrid+rerank", k=2)
+    assert built == ["some/cross-encoder"] and spy.calls and result.relevance_kind == "rerank"
+
+
+def test_the_stub_reranker_works_end_to_end_through_settings(tmp_path):
+    base = write_stub_index(tmp_path / "index", CORPUS)
+    settings = base.model_copy(update={"reranker_enabled": True, "reranker": "stub"})
+    result = Retriever.from_settings(settings, tmp_path / "index").search("penalties applicable to infringements", app_config(settings), k=3)
+    assert sections(result)[0] == "article:99" and result.relevance_kind == "rerank"
+    assert 0.0 < result.relevance <= 1.0     # the stub's Jaccard scale
+
+
+def test_a_missing_index_still_fails_clearly_before_any_reranker_is_built(tmp_path, monkeypatch):
+    from askact import retrieval
+
+    monkeypatch.setattr(retrieval, "get_reranker", lambda settings: SpyReranker())
+    base = Settings(_env_file=None, embedder="stub", reranker_enabled=True)
+    with pytest.raises(IndexUnavailableError, match="python -m askact.ingest"):
+        Retriever.from_settings(base, tmp_path / "nowhere")
+
+
 # --- how many results (R2.5) --------------------------------------------------------------------------------------------
 
-@pytest.mark.parametrize("config", ALL)
+@pytest.mark.parametrize("config", NON_RERANK)
 @pytest.mark.parametrize("k", [1, 2, 3])
 def test_exactly_k_chunks_are_returned(retriever, config, k):
     assert len(retriever.search("remote biometric identification systems", config, k=k).chunks) == k
 
 
-@pytest.mark.parametrize("config", ALL)
+@pytest.mark.parametrize("config", NON_RERANK)
 def test_asking_for_more_than_the_index_holds_returns_everything_once(retriever, config):
     result = retriever.search("remote biometric identification systems", config, k=50)
     assert len(result.chunks) <= len(CORPUS)
@@ -374,7 +613,7 @@ def test_asking_for_more_than_the_index_holds_returns_everything_once(retriever,
 
 # --- result shape and metadata (R2.5) -------------------------------------------------------------------------------------
 
-@pytest.mark.parametrize("config", ALL)
+@pytest.mark.parametrize("config", NON_RERANK)
 def test_each_result_carries_full_citation_metadata_and_a_finite_score(retriever, config):
     result = retriever.search("penalties", config, k=3)
     for scored in result.chunks:
@@ -400,7 +639,7 @@ def test_the_title_and_text_are_those_of_the_chunk_not_the_embedded_string(retri
 
 # --- relevance (the input to the not-covered gate) ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("config", ALL)
+@pytest.mark.parametrize("config", NON_RERANK)
 def test_relevance_is_the_dense_cosine_of_the_top_chunk_for_every_config(config):
     retriever, chunks = scripted_retriever()
     result = retriever.search("zeta", config, k=2)
@@ -430,12 +669,12 @@ def test_relevance_follows_the_top_ranked_chunk_of_each_config():
 # --- invalid use ------------------------------------------------------------------------------------------------------------------
 
 def test_an_unknown_config_is_refused_and_the_valid_ones_are_listed(retriever):
-    with pytest.raises(ValueError, match=r"unknown retrieval config 'fuzzy'; expected one of bm25, dense, hybrid"):
+    with pytest.raises(ValueError, match=r"unknown retrieval config 'fuzzy'; expected one of bm25, dense, hybrid, hybrid\+rerank"):
         retriever.search("penalties", "fuzzy", k=3)
 
 
-def test_the_reranked_config_says_it_is_not_available_yet(retriever):
-    with pytest.raises(ValueError, match="hybrid\\+rerank.*added with the reranker"):
+def test_the_reranked_config_without_a_reranker_says_how_to_enable_it(retriever):
+    with pytest.raises(ValueError, match=r"'hybrid\+rerank' needs a reranker.*RERANKER_ENABLED=true"):
         retriever.search("penalties", "hybrid+rerank", k=3)
 
 
@@ -451,18 +690,12 @@ def test_a_blank_query_is_refused(retriever, query):
         retriever.search(query, "bm25", k=3)
 
 
-def test_the_configs_are_the_three_documented_ones():
-    assert CONFIGS == ("bm25", "dense", "hybrid")
+def test_the_configs_are_the_four_documented_ones():
+    assert CONFIGS == ("bm25", "dense", "hybrid", "hybrid+rerank")
 
 
 def test_the_documented_defaults():
-    assert (RRF_K, HYBRID_CANDIDATES) == (60, 30)
-
-
-def test_the_rerank_hint_is_only_given_for_the_reranked_config(retriever):
-    with pytest.raises(ValueError) as excinfo:
-        retriever.search("penalties", "fuzzy", k=3)
-    assert "reranker" not in str(excinfo.value)
+    assert (RRF_K, HYBRID_CANDIDATES, RERANK_CANDIDATES) == (60, 30, 20)
 
 
 def test_the_default_number_of_candidates_is_used_when_none_is_given(stub):
@@ -579,7 +812,7 @@ def test_real_source_bm25_finds_an_article_by_its_number_and_title(real_retrieve
 
 
 @real_source
-@pytest.mark.parametrize("config", ALL)
+@pytest.mark.parametrize("config", NON_RERANK)
 def test_real_source_every_config_returns_k_distinct_chunks_with_finite_scores(real_retriever, config):
     result = real_retriever.search("What are the obligations of providers of high-risk AI systems?", config, k=10)
     assert len(result.chunks) == 10 and len(set(ids(result))) == 10
@@ -596,7 +829,31 @@ def test_the_real_model_ranks_the_matching_fixture_article_first_in_every_config
     settings = Settings(_env_file=None, embedder="real")
     embedder = get_embedder(settings)
     retriever = Retriever(make_index(chunk_act(parse_act(FIXTURE.read_bytes()), 1800), embedder), embedder)
-    for config in ALL:
+    for config in NON_RERANK:
         result = retriever.search("Which AI practices are prohibited?", config, k=3)
         assert str(result.chunks[0].chunk.section_id) in {"article:5", "recital:8"}, config
         assert 0.0 < result.relevance <= 1.0001 and result.relevance_kind == "cosine"
+
+
+@pytest.mark.slow
+def test_the_real_cross_encoder_reranks_the_fixture_and_separates_on_topic_from_off_topic():
+    pytest.importorskip("sentence_transformers", reason="the `models` extra is not installed")
+    from askact.embedders import get_embedder
+    from askact.rerankers import get_reranker
+
+    settings = Settings(_env_file=None, embedder="real", reranker="real", reranker_enabled=True)
+    embedder = get_embedder(settings)
+    retriever = Retriever(
+        make_index(chunk_act(parse_act(FIXTURE.read_bytes()), 1800), embedder), embedder, get_reranker(settings)
+    )
+    assert app_config(settings) == "hybrid+rerank"
+
+    on_topic = retriever.search("Which AI practices are prohibited?", "hybrid+rerank", k=3)
+    off_topic = retriever.search("How do I bake sourdough bread?", "hybrid+rerank", k=3)
+
+    assert str(on_topic.chunks[0].chunk.section_id) == "article:5"
+    assert on_topic.relevance_kind == "rerank" and off_topic.relevance_kind == "rerank"
+    scores = [s.score for s in on_topic.chunks]
+    assert scores == sorted(scores, reverse=True)          # reranked order is by the reranker's score
+    assert on_topic.relevance == scores[0]
+    assert on_topic.relevance > 0 > off_topic.relevance    # a logit scale: relevant is positive, irrelevant negative

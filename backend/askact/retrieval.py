@@ -1,18 +1,20 @@
-"""Retrieval: find the chunks most relevant to a question (R2.1, R2.2, R2.3, R2.5).
+"""Retrieval: find the chunks most relevant to a question (R2.1 to R2.5).
 
-Three ways of ranking the index, called "configs" because the evaluation compares them:
+Four ways of ranking the index, called "configs" because the evaluation compares them:
 
-  bm25    lexical: Okapi BM25 over the words of each chunk's embedded string
-  dense   semantic: cosine similarity between the query and chunk embeddings
-  hybrid  both, combined by Reciprocal Rank Fusion
+  bm25           lexical: Okapi BM25 over the words of each chunk's embedded string
+  dense          semantic: cosine similarity between the query and chunk embeddings
+  hybrid         both, combined by Reciprocal Rank Fusion
+  hybrid+rerank  hybrid, then a cross-encoder re-scores the best candidates
 
-Every result also carries a *relevance* score for the "not covered" gate: the dense cosine between
-the query and the top-ranked chunk, computed the same way whichever config ranked it, so one
-threshold means the same thing for all of them (R3.8). (The fourth config, `hybrid+rerank`, arrives
-with the reranker.)
+Every result also carries a *relevance* score for the "not covered" gate (R3.8):
+  * for `hybrid+rerank`, the reranker's score for the top-ranked chunk (`relevance_kind="rerank"`);
+  * for every other config, the dense cosine between the query and the top-ranked chunk, computed the
+    same way whichever config ranked it (`relevance_kind="cosine"`).
+The two are on different scales (a cosine is at most 1, a cross-encoder score is an unbounded logit),
+which is why the gate has two thresholds.
 """
 
-import re
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, get_args
@@ -23,9 +25,10 @@ from rank_bm25 import BM25Okapi
 from askact.config import Settings
 from askact.embedders import Embedder, Vectors, get_embedder
 from askact.index import INDEX_DIR, Index, load_index
-from askact.models import RetrievalResult, ScoredChunk
+from askact.models import RetrievalResult, ScoredChunk, tokenize
+from askact.rerankers import Reranker, checked_scores, get_reranker
 
-Config = Literal["bm25", "dense", "hybrid"]
+Config = Literal["bm25", "dense", "hybrid", "hybrid+rerank"]
 CONFIGS: tuple[str, ...] = get_args(Config)
 
 # Reciprocal Rank Fusion: each ranker gives a chunk 1 / (RRF_K + rank). 60 is the constant from the
@@ -33,12 +36,17 @@ CONFIGS: tuple[str, ...] = get_args(Config)
 RRF_K = 60
 # How many chunks each ranker contributes to the fusion.
 HYBRID_CANDIDATES = 30
+# How many of the best fused chunks the reranker re-scores. A cross-encoder reads the question and the
+# passage together, so it is run on a short list only.
+RERANK_CANDIDATES = 20
 
 
-def tokenize(text: str) -> list[str]:
-    """Lower-cased word tokens. No stemming and no stop words: predictable for legal terms, and the
-    header ("Article 5 — Prohibited AI practices") is part of the text, so titles and numbers match."""
-    return re.findall(r"\w+", text.lower())
+def app_config(settings: Settings) -> Config:
+    """The config the running app uses: reranked hybrid if RERANKER_ENABLED, otherwise plain hybrid (R2.4).
+
+    The evaluation harness does not use this: it compares all four configs whatever the flag says.
+    """
+    return "hybrid+rerank" if settings.reranker_enabled else "hybrid"
 
 
 def rrf(rankings: Sequence[Sequence[int]], k: int = RRF_K) -> list[tuple[int, float]]:
@@ -62,9 +70,21 @@ def _best_first(scores: np.ndarray, n: int) -> list[int]:
 
 
 class Retriever:
-    """Searches one loaded index. Build it once and reuse it: it keeps the BM25 index in memory."""
+    """Searches one loaded index. Build it once and reuse it: it keeps the BM25 index in memory.
 
-    def __init__(self, index: Index, embedder: Embedder, *, candidates: int = HYBRID_CANDIDATES):
+    `reranker` is optional: without one, the `hybrid+rerank` config is unavailable and no reranking
+    model is ever loaded or called.
+    """
+
+    def __init__(
+        self,
+        index: Index,
+        embedder: Embedder,
+        reranker: Reranker | None = None,
+        *,
+        candidates: int = HYBRID_CANDIDATES,
+        rerank_candidates: int = RERANK_CANDIDATES,
+    ):
         manifest = index.manifest
         if embedder.name != manifest.embedding_model or embedder.dimension != manifest.dimension:
             # Query vectors from another model are meaningless against these embeddings.
@@ -72,17 +92,24 @@ class Retriever:
                 f"the index was built with {manifest.embedding_model!r} ({manifest.dimension} dimensions) but the "
                 f"embedder is {embedder.name!r} ({embedder.dimension} dimensions): run `python -m askact.ingest`"
             )
-        if candidates < 1:
-            raise ValueError(f"candidates must be at least 1, got {candidates}")
+        if candidates < 1 or rerank_candidates < 1:
+            raise ValueError(f"candidates must be at least 1, got {candidates} and {rerank_candidates}")
         self._index = index
         self._embedder = embedder
+        self._reranker = reranker
         self._candidates = candidates
+        self._rerank_candidates = rerank_candidates
         self._bm25 = BM25Okapi([tokenize(chunk.embed_text) for chunk in index.chunks])
 
     @classmethod
     def from_settings(cls, settings: Settings, directory: Path = INDEX_DIR) -> "Retriever":
-        """Load the index (raising IndexUnavailableError with instructions if it is missing or stale)."""
-        return cls(load_index(settings, directory), get_embedder(settings))
+        """Load the index, and the reranker only if RERANKER_ENABLED (R2.4).
+
+        Raises IndexUnavailableError, with instructions, if the index is missing or stale. With the flag off
+        the reranking model is not even constructed, so it is neither downloaded nor held in memory.
+        """
+        reranker = get_reranker(settings) if settings.reranker_enabled else None
+        return cls(load_index(settings, directory), get_embedder(settings), reranker)
 
     def _bm25_scores(self, query: str) -> np.ndarray:
         return np.asarray(self._bm25.get_scores(tokenize(query)), dtype=np.float64)
@@ -90,36 +117,44 @@ class Retriever:
     def search(self, query: str, config: Config, k: int) -> RetrievalResult:
         """The top `k` chunks for `query` under `config`, best first, with scores and metadata.
 
-        `score` is the config's own ranking score (BM25, cosine, or the fused RRF score), so it is only
-        comparable within one result. `relevance` is the dense cosine of the top chunk, for every config.
+        `score` is the config's own ranking score (BM25, cosine, the fused RRF score, or the reranker's
+        score), so it is only comparable within one result. `relevance` is described in the module docstring.
         """
         if config not in CONFIGS:
-            hint = " (`hybrid+rerank` is added with the reranker)" if config == "hybrid+rerank" else ""
-            raise ValueError(f"unknown retrieval config {config!r}; expected one of {', '.join(CONFIGS)}{hint}")
+            raise ValueError(f"unknown retrieval config {config!r}; expected one of {', '.join(CONFIGS)}")
+        if config == "hybrid+rerank" and self._reranker is None:
+            raise ValueError(
+                "the config 'hybrid+rerank' needs a reranker, but this retriever has none because reranking is "
+                "disabled: set RERANKER_ENABLED=true (the running app picks its config with app_config())"
+            )
         if k < 1:
             raise ValueError(f"k must be at least 1, got {k}")
         if not query.strip():
             raise ValueError("the query is empty")
 
-        # Every config embeds the query: `relevance` needs the cosine of the top chunk even when BM25
+        # Every config embeds the query: the cosine relevance needs the top chunk's cosine even when BM25
         # did the ranking. The whole matrix product is a few hundred rows, so there is no reason to
         # compute only the one row bm25 needs.
         query_vector = self._embedder.embed_query(query)
         cosines = self._index.embeddings @ query_vector
 
-        if config == "dense":
-            ranked = [(i, float(cosines[i])) for i in _best_first(cosines, k)]
-        elif config == "bm25":
-            bm25 = self._bm25_scores(query)
-            ranked = [(i, float(bm25[i])) for i in _best_first(bm25, k)]
+        if config == "hybrid+rerank":
+            ranked = self._rerank(query, cosines, k)
+            relevance, kind = ranked[0][1], "rerank"
         else:
-            ranked = self._hybrid(query, cosines, k)
+            if config == "dense":
+                ranked = [(i, float(cosines[i])) for i in _best_first(cosines, k)]
+            elif config == "bm25":
+                bm25 = self._bm25_scores(query)
+                ranked = [(i, float(bm25[i])) for i in _best_first(bm25, k)]
+            else:
+                ranked = self._hybrid(query, cosines, k)
+            relevance, kind = float(cosines[ranked[0][0]]), "cosine"
 
-        top_index = ranked[0][0]
         return RetrievalResult(
             chunks=[ScoredChunk(chunk=self._index.chunks[i], score=score) for i, score in ranked],
-            relevance=float(cosines[top_index]),
-            relevance_kind="cosine",
+            relevance=relevance,
+            relevance_kind=kind,
         )
 
     def _hybrid(self, query: str, cosines: Vectors, k: int) -> list[tuple[int, float]]:
@@ -130,3 +165,13 @@ class Retriever:
         # letting the arbitrary first `pool` such chunks into the fusion would reward them for nothing.
         bm25_ranking = [i for i in _best_first(bm25, pool) if bm25[i] > 0]
         return rrf([dense_ranking, bm25_ranking])[:k]
+
+    def _rerank(self, query: str, cosines: Vectors, k: int) -> list[tuple[int, float]]:
+        """Re-score the best fused chunks with the reranker and return the top k by its score."""
+        assert self._reranker is not None  # search() has checked
+        candidates = self._hybrid(query, cosines, max(self._rerank_candidates, k))
+        passages = [self._index.chunks[i].embed_text for i, _ in candidates]  # header included, as for embedding
+        scores = checked_scores(self._reranker, query, passages)
+        # Stable sort: chunks the reranker scores equally keep their fused order.
+        reranked = sorted(zip((i for i, _ in candidates), scores), key=lambda item: -item[1])
+        return reranked[:k]

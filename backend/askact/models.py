@@ -12,6 +12,15 @@ from typing import Any, Literal, get_args
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 from pydantic_core import core_schema
 
+def tokenize(text: str) -> list[str]:
+    """Lower-cased word tokens. No stemming and no stop words: predictable for legal terms.
+
+    Defined once, here, because lexical search (BM25), the stub embedder and the stub reranker must all
+    agree on what a "word" is, or a test of one would not describe the others.
+    """
+    return re.findall(r"\w+", text.lower())
+
+
 Kind = Literal["article", "recital", "annex"]
 # Maps a lower-case word to its typed kind, so parsing needs no cast and unknown kinds are rejected.
 _KINDS: dict[str, Kind] = {kind: kind for kind in get_args(Kind)}

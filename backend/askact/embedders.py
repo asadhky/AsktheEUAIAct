@@ -17,6 +17,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from askact.config import Settings
+from askact.models import tokenize
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ class HashEmbedder:
 
     def _embed(self, text: str) -> Vectors:
         vector = np.zeros(self.dimension, dtype=np.float64)
-        for token in re.findall(r"\w+", text.lower()):
+        for token in tokenize(text):
             vector[self._bucket(token)] += 1.0
         norm = np.linalg.norm(vector)
         return (vector / norm if norm else vector).astype(np.float32)
