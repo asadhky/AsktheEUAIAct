@@ -48,7 +48,7 @@ Checkboxes are ticked only after you approve the task.
   - *Tests:* fixture counts asserted; article number/title extraction; table flattening; pin check rejects a wrong `<title>` and a wrong count (including when the file came from the manual fallback); the full-source count test runs only if the real file exists, else `pytest.skip` with a reason.
   - *Covers:* R1.5 (pin check), R1.6, R1.7, R1.11, R1.12, R1.13 (parse half).
 
-- [ ] **Task 5 — Ingestion: chunker and token-length check**
+- [x] **Task 5 — Ingestion: chunker and token-length check**
   - *Goal:* citable, bounded-size chunks that carry their metadata.
   - *Files:* `backend/askact/ingest/chunk.py`, `backend/tests/ingest/test_chunk.py`, a `slow` test in the same folder.
   - *Behaviour:* one algorithm for recitals, articles and annexes (35 of the 180 recitals exceed the limit, so recitals are not always one chunk): blocks packed whole up to `CHUNK_MAX_CHARS` measured on the embedded string (header + text); an oversize block is split at line, then sentence, then word boundaries; no overlap; stable `chunk_id`; every chunk keeps number, title, parent section id; the header-prefixed embed string is built in one place (§2).
