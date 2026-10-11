@@ -36,10 +36,10 @@ class Counts:
     annexes: int
 
 
-# The number of sections in the original Official Journal text of Regulation (EU) 2024/1689.
-# Unset until confirmed by the project owner against the parser's output on the real file:
-# until then `verify` refuses to run, rather than pin a number nobody has checked.
-EXPECTED_COUNTS: Counts | None = None
+# The number of sections in the original Official Journal text of Regulation (EU) 2024/1689
+# (Task 4's parser run on the real file found these, and the project owner confirmed them).
+# `verify` still refuses to run if this is ever set back to None, rather than pin an unchecked number.
+EXPECTED_COUNTS: Counts | None = Counts(recitals=180, articles=113, annexes=13)
 
 
 @dataclass(frozen=True)
