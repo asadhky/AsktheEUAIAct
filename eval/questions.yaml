@@ -1,0 +1,328 @@
+# Evaluation questions for "Ask the EU AI Act" (50 questions: 29 dev, 21 test).
+#
+# AUTHORSHIP: drafted by the Kiro agent, NOT hand-written by the project owner, and not yet reviewed by
+# the owner. The README must say so (requirements R5.1 and R7.3 assume owner-written questions).
+#
+# How they were made
+#   * Every question and every expected section was checked against the text of the Act
+#     (data/raw/ai-act-oj-2024-1689.html), never against retrieval output. The retriever was not run
+#     on these questions while they were written.
+#   * expected_ids lists operative provisions only (articles and annexes). Recitals that discuss the same
+#     topic are NOT listed, so a retrieved recital counts as a miss even when it is on topic. Expect hit@k
+#     to understate retrieval a little for that reason.
+#   * Dev/test: within each category, a seeded shuffle (Python random.Random(2026)) sent 60% to dev
+#     and the rest to test, so neither split was picked by hand. Tune only on dev (R5.10).
+#   * Do not edit a question after seeing how it scores. Fixing a wrong expected id is fine, but say so.
+#
+# Format: see askact/evaluation/schema.py.
+#   split: dev | test        category: direct | paraphrase | multi | out_of_scope
+#   expected_ids: section ids such as article:5 or annex:III; [] exactly for out_of_scope.
+#   All listed sections are relevant (not alternatives): a hit needs any one, citation recall needs all.
+
+# ---- direct: Wording taken from the Act. One section answers each.
+
+- id: q001
+  question: "What is the maximum administrative fine for non-compliance with the prohibition of AI practices referred to in Article 5?"
+  split: dev
+  category: direct
+  expected_ids: [article:99]
+
+- id: q002
+  question: "Which obligations apply to providers of general-purpose AI models?"
+  split: test
+  category: direct
+  expected_ids: [article:53]
+
+- id: q003
+  question: "What does the AI Act say about human oversight of high-risk AI systems?"
+  split: dev
+  category: direct
+  expected_ids: [article:14]
+
+- id: q004
+  question: "How is 'deployer' defined in the AI Act?"
+  split: test
+  category: direct
+  expected_ids: [article:3]
+
+- id: q005
+  question: "When does the AI Act enter into force and from when does it apply?"
+  split: dev
+  category: direct
+  expected_ids: [article:113]
+
+- id: q006
+  question: "What is a fundamental rights impact assessment, and which deployers have to carry one out?"
+  split: test
+  category: direct
+  expected_ids: [article:27]
+
+- id: q007
+  question: "What are the data governance requirements for the training, validation and testing data sets of high-risk AI systems?"
+  split: dev
+  category: direct
+  expected_ids: [article:10]
+
+- id: q008
+  question: "What are the obligations of importers of high-risk AI systems?"
+  split: dev
+  category: direct
+  expected_ids: [article:23]
+
+- id: q009
+  question: "What is the right to explanation of individual decision-making?"
+  split: test
+  category: direct
+  expected_ids: [article:86]
+
+- id: q010
+  question: "What does the quality management system of a provider of high-risk AI systems have to include?"
+  split: dev
+  category: direct
+  expected_ids: [article:17]
+
+- id: q011
+  question: "For how long must providers keep the documentation of a high-risk AI system?"
+  split: dev
+  category: direct
+  expected_ids: [article:18]
+
+- id: q012
+  question: "What AI literacy obligations do providers and deployers have?"
+  split: test
+  category: direct
+  expected_ids: [article:4]
+
+- id: q013
+  question: "By when must each Member State have an AI regulatory sandbox operational?"
+  split: dev
+  category: direct
+  expected_ids: [article:57]
+
+- id: q014
+  question: "What fines can the Commission impose on providers of general-purpose AI models?"
+  split: test
+  category: direct
+  expected_ids: [article:101]
+
+# ---- paraphrase: Everyday wording, avoiding the Act's own terms. One section answers each.
+
+- id: q015
+  question: "Can the police use live facial recognition cameras on the street to look for criminals?"
+  split: test
+  category: paraphrase
+  expected_ids: [article:5]
+
+- id: q016
+  question: "Is it legal for an employer to use AI to read its employees' emotions during their working day?"
+  split: test
+  category: paraphrase
+  expected_ids: [article:5]
+
+- id: q017
+  question: "Do I have to tell customers that they are talking to a bot when they use my support chat?"
+  split: dev
+  category: paraphrase
+  expected_ids: [article:50]
+
+- id: q018
+  question: "What is the maximum fine if a company gives the authorities misleading information?"
+  split: test
+  category: paraphrase
+  expected_ids: [article:99]
+
+- id: q019
+  question: "If someone believes an AI system has broken the rules, can they complain to an authority?"
+  split: test
+  category: paraphrase
+  expected_ids: [article:85]
+
+- id: q020
+  question: "Does the AI Act apply to a company based outside the EU?"
+  split: dev
+  category: paraphrase
+  expected_ids: [article:2]
+
+- id: q021
+  question: "Are AI systems built purely for military use covered by the Act?"
+  split: dev
+  category: paraphrase
+  expected_ids: [article:2]
+
+- id: q022
+  question: "What must a company do after its AI system has been involved in a serious accident?"
+  split: dev
+  category: paraphrase
+  expected_ids: [article:73]
+
+- id: q023
+  question: "Are people who blow the whistle on breaches of the AI Act protected?"
+  split: dev
+  category: paraphrase
+  expected_ids: [article:87]
+
+- id: q024
+  question: "Do AI developers have to respect copyright when they train their models?"
+  split: test
+  category: paraphrase
+  expected_ids: [article:53]
+
+- id: q025
+  question: "When can an AI system used in a sensitive area such as hiring still be treated as not high-risk?"
+  split: test
+  category: paraphrase
+  expected_ids: [article:6]
+
+- id: q026
+  question: "A provider from outside the EU wants to sell a high-risk AI system here: do they need someone local?"
+  split: dev
+  category: paraphrase
+  expected_ids: [article:22]
+
+- id: q027
+  question: "Which kinds of AI use count as high-risk in areas such as education or credit scoring?"
+  split: dev
+  category: paraphrase
+  expected_ids: [annex:III]
+
+- id: q028
+  question: "How much computing power makes a general-purpose AI model count as having high impact?"
+  split: dev
+  category: paraphrase
+  expected_ids: [article:51]
+
+# ---- multi: The answer needs more than one section; every listed section is relevant.
+
+- id: q029
+  question: "What technical documentation must the provider of a high-risk AI system prepare, and what must it contain?"
+  split: dev
+  category: multi
+  expected_ids: [article:11, annex:IV]
+
+- id: q030
+  question: "For how long must the logs automatically generated by a high-risk AI system be kept?"
+  split: test
+  category: multi
+  expected_ids: [article:19, article:26]
+
+- id: q031
+  question: "When does a general-purpose AI model count as one with systemic risk, and what extra obligations then apply to its provider?"
+  split: dev
+  category: multi
+  expected_ids: [article:51, article:55]
+
+- id: q032
+  question: "How do the maximum fines for ordinary operators differ from those for providers of general-purpose AI models?"
+  split: dev
+  category: multi
+  expected_ids: [article:99, article:101]
+
+- id: q033
+  question: "What are the rules for testing a high-risk AI system in real-world conditions, including the consent of the people taking part?"
+  split: test
+  category: multi
+  expected_ids: [article:60, article:61]
+
+- id: q034
+  question: "When must a provider outside the EU appoint an authorised representative, for high-risk systems and for general-purpose models?"
+  split: test
+  category: multi
+  expected_ids: [article:22, article:54]
+
+- id: q035
+  question: "What must providers do once their high-risk AI system is on the market: monitoring it and reporting incidents?"
+  split: test
+  category: multi
+  expected_ids: [article:72, article:73]
+
+- id: q036
+  question: "What lighter rules does the Act give to small companies and start-ups?"
+  split: dev
+  category: multi
+  expected_ids: [article:62, article:63]
+
+- id: q037
+  question: "How does a provider show that a high-risk AI system complies before selling it: assessment, declaration and marking?"
+  split: dev
+  category: multi
+  expected_ids: [article:43, article:47, article:48]
+
+- id: q038
+  question: "What powers does the Commission have to check up on providers of general-purpose AI models?"
+  split: dev
+  category: multi
+  expected_ids: [article:91, article:92, article:93]
+
+- id: q039
+  question: "What applies to AI systems that were already on the market before the Act, and when do the main provisions start to apply?"
+  split: test
+  category: multi
+  expected_ids: [article:111, article:113]
+
+- id: q040
+  question: "Which AI practices are banned, and what is the penalty for using them?"
+  split: dev
+  category: multi
+  expected_ids: [article:5, article:99]
+
+# ---- out_of_scope: The Act's text does not answer these. Three are plainly unrelated; the rest sit close to the Act's subject.
+
+- id: q041
+  question: "What is a good recipe for a quick tomato soup?"
+  split: test
+  category: out_of_scope
+  expected_ids: []
+
+- id: q042
+  question: "How do I train a neural network with PyTorch?"
+  split: dev
+  category: out_of_scope
+  expected_ids: []
+
+- id: q043
+  question: "What are the rules for AI in the United States?"
+  split: test
+  category: out_of_scope
+  expected_ids: []
+
+- id: q044
+  question: "How does the AI Act compare with China's rules on generative AI?"
+  split: dev
+  category: out_of_scope
+  expected_ids: []
+
+- id: q045
+  question: "Is ChatGPT classified as a high-risk AI system?"
+  split: test
+  category: out_of_scope
+  expected_ids: []
+
+- id: q046
+  question: "Which companies have already been fined under the AI Act?"
+  split: dev
+  category: out_of_scope
+  expected_ids: []
+
+- id: q047
+  question: "What changes did the Digital Omnibus on AI make to the application dates of the AI Act?"
+  split: test
+  category: out_of_scope
+  expected_ids: []
+
+- id: q048
+  question: "What does Article 130 of the AI Act say about penalties?"
+  split: dev
+  category: out_of_scope
+  expected_ids: []
+
+- id: q049
+  question: "What is the maximum fine under the GDPR for a personal data breach?"
+  split: dev
+  category: out_of_scope
+  expected_ids: []
+
+- id: q050
+  question: "How many staff does the AI Office currently employ?"
+  split: dev
+  category: out_of_scope
+  expected_ids: []
