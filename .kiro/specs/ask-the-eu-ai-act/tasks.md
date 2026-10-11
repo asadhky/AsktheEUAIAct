@@ -88,7 +88,7 @@ Checkboxes are ticked only after you approve the task.
 
 ## B. Retrieval-only evaluation (still no LLM)
 
-- [ ] **Task 10 — Eval schema and loader**
+- [x] **Task 10 — Eval schema and loader**
   - *Goal:* `eval/questions.yaml` is validated strictly, so no score is ever computed from bad input.
   - *Files:* `backend/askact/evaluation/schema.py`, `backend/tests/evaluation/test_schema.py`.
   - *Behaviour:* pydantic entries with `id`, `question`, `split` (`dev|test`, required), `category`, `expected_ids` (section ids; empty exactly for `out_of_scope`); unique ids; errors name the offending entry (position, line and id) and list every problem found. `load_questions` raises `EvalSetError`; the CLI that turns it into a non-zero exit is the harness in Task 11 (there is no CLI yet in this task). Also rejected: unknown keys, a key written twice in one entry, non-string ids. Details in design §3.6.
@@ -100,6 +100,7 @@ Checkboxes are ticked only after you approve the task.
   - *Files:* `backend/askact/evaluation/metrics.py`, `backend/askact/evaluation/run.py` (`--k`, `--split dev|test|both`, `--configs`, `--no-generation`), `backend/tests/evaluation/test_metrics.py`, `test_run.py`.
   - *Behaviour:* hit = a retrieved chunk whose parent section is in `expected_ids`; hit@k and MRR over in-scope entries only; `out_of_scope` excluded; per config and per split; prints a Markdown table plus a metadata block (date, `k`, models, index `build_hash`, question counts per split) and writes `eval/results.md`; also prints, per config and split, the range of the relevance score for in-scope vs `out_of_scope` questions; default `--split dev`, and a `test` run is labelled FINAL; no table is produced on a validation error: `EvalSetError` from the loader is printed to stderr and the process exits 1 (R5.4).
   - *Tests:* hand-computed cases covering a multi-id question (any one is a hit), several chunks of one section, no hit in the list (MRR 0), `out_of_scope` excluded, both splits reported, `k` reported; run on the fixture index with stubs.
+  - *Also in this task:* `--no-generation` is required until Task 19 adds generation metrics (the CLI refuses to run without it, so a table that lacks those columns cannot look complete); a stub run is flagged with a warning in the report; the harness builds its own reranker only when `hybrid+rerank` is selected, whatever `RERANKER_ENABLED` says. `CONFIGS` in `retrieval.py` is now typed `tuple[Config, ...]`. Details in design §3.6.
   - *Covers:* R5.5, R5.6, R5.11 (retrieval columns), R5.12 (table written to file), R5.13.
 
 > **Checkpoint — your turn.** You write `eval/questions.yaml` (hand-written questions, `dev`/`test` split). I then run the retrieval-only eval on `dev` with the real models and show you the real output. We review those numbers together before any generation work starts.
