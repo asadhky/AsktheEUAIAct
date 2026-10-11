@@ -338,11 +338,11 @@ def _roman(n: int) -> str:
     return out
 
 
-def verify(act: ParsedAct, expected: Counts | None = None) -> None:
-    """Check the parsed counts against the pinned ones and that the numbering has no gaps.
+def verify_counts(act: ParsedAct, expected: Counts | None = None) -> None:
+    """Check the number of recitals, articles and annexes against the pinned counts.
 
-    `expected` defaults to EXPECTED_COUNTS. Any mismatch aborts the build (R1.13): it means the
-    document is not the pinned one, or the parser lost or invented a section.
+    `expected` defaults to EXPECTED_COUNTS. A mismatch means the document is not the pinned one,
+    or the parser lost or invented a section.
     """
     expected = expected or EXPECTED_COUNTS
     if expected is None:
@@ -353,6 +353,20 @@ def verify(act: ParsedAct, expected: Counts | None = None) -> None:
             f"{act.counts.annexes} annexes, but the pinned text has {expected.recitals}, "
             f"{expected.articles} and {expected.annexes}"
         )
+
+
+def verify(act: ParsedAct, expected: Counts | None = None) -> None:
+    """The full check on the pinned document: its counts, and numbering without gaps (R1.13).
+
+    Any failure aborts the build. A trimmed test document can only satisfy `verify_counts`,
+    because its sections keep their real, non-contiguous numbers.
+    """
+    verify_counts(act, expected)
+    verify_numbering(act)
+
+
+def verify_numbering(act: ParsedAct) -> None:
+    """Recitals and articles run 1..n and annexes I..n, in order, with nothing missing or repeated."""
     for kind, sections in (("recital", act.recitals), ("article", act.articles), ("annex", act.annexes)):
         want = [str(n) if kind != "annex" else _roman(n) for n in range(1, len(sections) + 1)]
         got = [s.section_id.number for s in sections]
