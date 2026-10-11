@@ -40,7 +40,7 @@ Checkboxes are ticked only after you approve the task.
   - *Tests (`httpx.MockTransport`, no network):* cache reuse; `--force` refetches; HTTP error falls back; non-HTML/empty response falls back; with no path configured and the fetch failing, the default manual file in `data/raw/` is used; an explicit `--source-file` wins over the default; nothing available → error.
   - *Covers:* R1.1, R1.2 (source URL), R1.3, R1.4, R1.13 (fetch half).
 
-- [ ] **Task 4 — Ingestion: parser, fixture, pin check**
+- [x] **Task 4 — Ingestion: parser, fixture, pin check**
   - *Goal:* turn the Official Journal HTML into recitals, articles and annexes.
   - *Files:* `backend/askact/ingest/parse.py`, `backend/tests/fixtures/mini_act.html` (3 recitals, 2 articles one of them long, 1 annex, same markup as the real page), `backend/tests/ingest/test_parse.py`.
   - *Behaviour:* recitals from `#rct_N`, articles from `#art_N` (number from `p.oj-ti-art`, title from `.eli-title p.oj-sti-art`), annexes from `#anx_ROMAN` (§3.1 table); table rows flattened to `"(a) text"` lines; pin check: document `<title>` starts with `L_202401689EN`, and parsed counts equal `EXPECTED_COUNTS`.
@@ -51,7 +51,7 @@ Checkboxes are ticked only after you approve the task.
 - [ ] **Task 5 — Ingestion: chunker and token-length check**
   - *Goal:* citable, bounded-size chunks that carry their metadata.
   - *Files:* `backend/askact/ingest/chunk.py`, `backend/tests/ingest/test_chunk.py`, a `slow` test in the same folder.
-  - *Behaviour:* recitals one chunk each; articles/annexes split into blocks and packed up to `CHUNK_MAX_CHARS`; oversize blocks split at sentence boundaries; no overlap; stable `chunk_id`; every chunk keeps number, title, parent section id; the header-prefixed embed string is built in one place (§2).
+  - *Behaviour:* one algorithm for recitals, articles and annexes (35 of the 180 recitals exceed the limit, so recitals are not always one chunk): blocks packed whole up to `CHUNK_MAX_CHARS` measured on the embedded string (header + text); an oversize block is split at line, then sentence, then word boundaries; no overlap; stable `chunk_id`; every chunk keeps number, title, parent section id; the header-prefixed embed string is built in one place (§2).
   - *Tests:* every chunk ≤ limit; long fixture article yields several chunks, each with the article number and title; ids stable across runs; recital stays whole. **`slow`:** over the real source, tokenize every chunk's embed string (header + text, special tokens included) with the real embedder's tokenizer and assert none exceeds the model's max sequence length (read from the loaded model); failure lists the chunk ids. Run it locally and report the result; if it fails, lower `CHUNK_MAX_CHARS` and rerun.
   - *Covers:* R1.8, R1.9.
 
