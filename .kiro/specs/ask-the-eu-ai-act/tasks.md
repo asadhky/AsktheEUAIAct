@@ -112,9 +112,9 @@ Checkboxes are ticked only after you approve the task.
 - [ ] **Task 12 — LLM interface, fake provider, prompt, response parsing**
   - *Goal:* the provider-agnostic seam, testable without any network.
   - *Files:* `backend/askact/generation/llm.py` (`LLMReply`, `complete(system, user, max_output_tokens)`, `FakeLLM` that scripts replies and counts calls, `get_llm(settings)` factory keyed on `LLM_PROVIDER`), `backend/askact/generation/prompt.py` (system prompt, passages labelled by section id), response parser, tests.
-  - *Behaviour:* the parser reads `{answer, citations, covered}` JSON, tolerating a code fence; anything else raises `llm_bad_output`; the factory raises `llm_unavailable` for an unknown provider or a missing key/model.
+  - *Behaviour:* the parser reads `{answer, citations, covered}` JSON, tolerating a code fence; anything else raises `llm_bad_output`; the factory raises `llm_unavailable` for an unset or unknown provider. **Scope change:** the "missing key/model" check moves to Task 14, because the only provider built here (`fake`) needs neither. The parser is in `generation/response.py` (the task text left its file open). Details in design §3.3.
   - *Tests:* prompt labels passages by section id and states the grounding/JSON rules; parser accepts valid and fenced JSON, rejects prose, a missing field and a wrong type; `FakeLLM` scripting and call counting; factory errors.
-  - *Covers:* R3.1 (prompt), R3.2, R3.3, R3.9 (selection by env), R3.10 (config errors), R6.12 (max-token parameter in the interface).
+  - *Covers:* R3.1 (prompt), R3.2, R3.3, R3.9 (selection by env), R3.10 (unset/unknown provider; missing key/model in Task 14), R6.12 (max-token parameter in the interface).
 
 - [ ] **Task 13 — Answer pipeline: gate, call, validate**
   - *Goal:* `answer()` implements the grounding rules.
@@ -127,7 +127,7 @@ Checkboxes are ticked only after you approve the task.
   - *Goal:* the one real provider (OpenAI, by your choice; no other real adapter is built), plus the proof that the provider is chosen by env var.
   - *Process:* **read OpenAI's current API docs first**; record the doc URL and read date in a comment at the top of the adapter.
   - *Files:* adapter in `generation/llm.py` (or its own module if it grows), tests.
-  - *Behaviour:* Chat Completions over `httpx` with the current output-token parameter; `LLM_BASE_URL` override; extract text and usage; auth/limit/model errors → `llm_unavailable`.
+  - *Behaviour:* Chat Completions over `httpx` with the current output-token parameter; `LLM_BASE_URL` override; extract text and usage; auth/limit/model errors → `llm_unavailable`; **a missing `LLM_API_KEY` or `LLM_MODEL` is `llm_unavailable` when the provider is built** (moved here from Task 12), with a message that names the variable and never contains the key.
   - *Tests:* request building and response/usage parsing via `httpx.MockTransport`; missing usage returns `None` counts; error mapping; **provider switch:** `get_llm(settings)` returns the fake provider for `LLM_PROVIDER=fake` and the OpenAI adapter for `LLM_PROVIDER=openai` with no other change, and rejects any other value (including `anthropic`) with the `llm_unavailable` configuration error. **`slow`/manual live smoke test:** one tiny real call, asserts a non-empty reply and reported usage; skipped without the key. Run once locally if you provide a key, and report the result.
   - *Covers:* R3.9, R3.10, R6.12.
 
