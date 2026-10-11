@@ -256,6 +256,13 @@ Next.js App Router + TypeScript, one page (`app/page.tsx`), a small `lib/api.ts`
 
 Extra checks: unique ids; section-id syntax. The harness does not cross-check ids against the index.
 
+How the loader (`askact/evaluation/schema.py`, `load_questions`) enforces "nothing is scored on bad input":
+- **All or nothing, all problems at once.** It returns every question or raises `EvalSetError`; the message lists the problems of every entry (not just the first), one per line, each naming the entry by position, line number and id (`entry 3 (line 17, id 'q003'): split: Input should be 'dev' or 'test' (got 'train')`). One limit: the rule tying `category` to `expected_ids` is checked only on an entry whose own fields are all valid, so it can surface on the run after the others are fixed.
+- **Strict.** All five keys are required (an `out_of_scope` entry writes `expected_ids: []` explicitly) and any other key is an error, so a misspelt `splt:` cannot silently default. `id` must be a string without spaces: YAML reads an unquoted `id: 007` as the number 7 and `id: no` as `false`, so those are rejected with a hint to quote.
+- **A key written twice is an error.** PyYAML alone keeps the last value without a word, so a duplicated `split:` line would quietly move a question between `dev` and `test`; the loader uses a safe loader that refuses duplicate keys. (Cheap to do, and it protects the one distinction R5.10 depends on.)
+- **`expected_ids` must be section ids.** `article:5#2` (a chunk id) is rejected with a hint naming the section id to use. `Article 5` is accepted and normalised to `article:5`; a section listed twice is an error.
+- **Exit code.** The loader only raises; turning `EvalSetError` into a non-zero exit with the message on stderr is done by the harness CLI (Task 11), the only place there is a CLI.
+
 **Metrics**, per retrieval config, per split (`k` is chunks; reported in the table header):
 - **hit@k** (in-scope only): 1 if any of the top-k chunks has `section_id ∈ expected_ids`, averaged.
 - **MRR** (in-scope only): `1/rank` of the first such chunk within the top-k, else 0, averaged. Ranks count chunks, so several chunks of one section occupy several ranks; we do not de-duplicate, to keep the metric the plain definition.

@@ -76,7 +76,7 @@ Checkboxes are ticked only after you approve the task.
   - *Tests (fixture index + stub embedder):* BM25 finds an exact-term passage; dense ordering with the stub; RRF arithmetic on a hand-computed example; result shape and metadata; `k` respected.
   - *Covers:* R2.1, R2.2, R2.3, R2.5 (three configs).
 
-- [ ] **Task 9 — Retrieval: reranker and relevance score**
+- [x] **Task 9 — Retrieval: reranker and relevance score**
   - *Goal:* the fourth config and the score the relevance gate will use.
   - *Files:* `backend/askact/rerankers.py` (`OverlapReranker` stub, cross-encoder real, selected by `RERANKER`), updates to `retrieval.py`, tests.
   - *Behaviour:* `hybrid+rerank` reranks the top `RERANK_CANDIDATES` fused candidates; with `RERANKER_ENABLED=false` the reranker is never loaded or called; every result carries `relevance` and `relevance_kind`: the reranker score of rank 1 for `hybrid+rerank`. (The dense-cosine case for `bm25`, `dense` and `hybrid` was implemented in Task 8, because `RetrievalResult` requires the field; this task adds the `rerank` case and extends `Config` and `CONFIGS` to include `hybrid+rerank`.)
@@ -91,14 +91,14 @@ Checkboxes are ticked only after you approve the task.
 - [ ] **Task 10 — Eval schema and loader**
   - *Goal:* `eval/questions.yaml` is validated strictly, so no score is ever computed from bad input.
   - *Files:* `backend/askact/evaluation/schema.py`, `backend/tests/evaluation/test_schema.py`.
-  - *Behaviour:* pydantic entries with `id`, `question`, `split` (`dev|test`, required), `category`, `expected_ids` (section ids; empty exactly for `out_of_scope`); unique ids; errors name the offending entry and the CLI exits non-zero.
+  - *Behaviour:* pydantic entries with `id`, `question`, `split` (`dev|test`, required), `category`, `expected_ids` (section ids; empty exactly for `out_of_scope`); unique ids; errors name the offending entry (position, line and id) and list every problem found. `load_questions` raises `EvalSetError`; the CLI that turns it into a non-zero exit is the harness in Task 11 (there is no CLI yet in this task). Also rejected: unknown keys, a key written twice in one entry, non-string ids. Details in design §3.6.
   - *Tests:* valid file loads; missing file, malformed YAML, missing `split`, bad `category`, chunk-id style `expected_ids`, non-empty `expected_ids` on `out_of_scope`, empty on in-scope, duplicate ids — each fails with a message naming the entry.
-  - *Covers:* R5.1, R5.2, R5.3, R5.4.
+  - *Covers:* R5.1, R5.2, R5.3, R5.4 (the schema and loader; the non-zero exit lands with the CLI in Task 11).
 
 - [ ] **Task 11 — Retrieval metrics and report (`--no-generation`)**
   - *Goal:* hit@k and MRR per retrieval config and split, with no LLM involved.
   - *Files:* `backend/askact/evaluation/metrics.py`, `backend/askact/evaluation/run.py` (`--k`, `--split dev|test|both`, `--configs`, `--no-generation`), `backend/tests/evaluation/test_metrics.py`, `test_run.py`.
-  - *Behaviour:* hit = a retrieved chunk whose parent section is in `expected_ids`; hit@k and MRR over in-scope entries only; `out_of_scope` excluded; per config and per split; prints a Markdown table plus a metadata block (date, `k`, models, index `build_hash`, question counts per split) and writes `eval/results.md`; also prints, per config and split, the range of the relevance score for in-scope vs `out_of_scope` questions; default `--split dev`, and a `test` run is labelled FINAL; no table is produced on a validation error.
+  - *Behaviour:* hit = a retrieved chunk whose parent section is in `expected_ids`; hit@k and MRR over in-scope entries only; `out_of_scope` excluded; per config and per split; prints a Markdown table plus a metadata block (date, `k`, models, index `build_hash`, question counts per split) and writes `eval/results.md`; also prints, per config and split, the range of the relevance score for in-scope vs `out_of_scope` questions; default `--split dev`, and a `test` run is labelled FINAL; no table is produced on a validation error: `EvalSetError` from the loader is printed to stderr and the process exits 1 (R5.4).
   - *Tests:* hand-computed cases covering a multi-id question (any one is a hit), several chunks of one section, no hit in the list (MRR 0), `out_of_scope` excluded, both splits reported, `k` reported; run on the fixture index with stubs.
   - *Covers:* R5.5, R5.6, R5.11 (retrieval columns), R5.12 (table written to file), R5.13.
 
