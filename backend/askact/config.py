@@ -54,8 +54,10 @@ class Settings(BaseSettings):
 
     # --- Generation ---
     # No honest default exists: they are tuned on the dev split. Until then the gate is unusable.
-    relevance_threshold_cosine: float | None = None  # bm25, dense, hybrid
-    relevance_threshold_rerank: float | None = None  # hybrid+rerank
+    # allow_inf_nan=False: `relevance < nan` is always False, so a NaN threshold would silently let every
+    # question through to the (paid) LLM. A rerank score can be negative, so any finite number is allowed.
+    relevance_threshold_cosine: float | None = Field(None, allow_inf_nan=False)  # bm25, dense, hybrid
+    relevance_threshold_rerank: float | None = Field(None, allow_inf_nan=False)  # hybrid+rerank
     # Validated where it is used (the provider factory), so an unsupported value gets a
     # clear "LLM unavailable" error instead of failing every import of the settings.
     llm_provider: str | None = None
