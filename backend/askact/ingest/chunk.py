@@ -14,6 +14,7 @@ a slow test checks it against the real tokenizer.
 import re
 from collections.abc import Iterable
 
+from askact.config import Settings
 from askact.ingest.parse import ParsedAct, Section
 from askact.models import Chunk
 
@@ -26,6 +27,18 @@ _BOUNDARY = re.compile(r"(?<=[.;?!:])\s+")
 
 # (separator to put before this unit when it follows another unit in the same chunk, text)
 _Unit = tuple[str, str]
+
+
+# Bump this whenever a change makes the chunker (or `Chunk.embed_text`) produce different chunks
+# for the same input. It is part of the index build hash, so an index built by the old code is
+# seen as stale instead of silently disagreeing with the new code. A test fails when the output
+# changes without a bump.
+CHUNKER_VERSION = 1
+
+
+def chunking_params(settings: Settings) -> dict[str, int]:
+    """Everything that decides what the chunks are, apart from the source text. Hashed into the index."""
+    return {"max_chars": settings.chunk_max_chars, "chunker_version": CHUNKER_VERSION}
 
 
 class ChunkError(ValueError):
