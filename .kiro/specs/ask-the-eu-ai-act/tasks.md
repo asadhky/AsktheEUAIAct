@@ -61,7 +61,7 @@ Checkboxes are ticked only after you approve the task.
   - *Tests:* stub is deterministic, L2-normalised, fixed dimension, and cosine is higher for texts that share words; the stub needs no download; a `slow` test loads the real model, embeds the fixture, and checks shape and normalisation. The query-instruction prefix for BGE is applied to queries only.
   - *Covers:* R2.2 (local, no-cost embeddings), R6.4 (stub embedder).
 
-- [ ] **Task 7 — Index artifacts and the `ingest` CLI**
+- [x] **Task 7 — Index artifacts and the `ingest` CLI**
   - *Goal:* `python -m askact.ingest` builds the index end to end, and the API can later check it.
   - *Files:* `backend/askact/index.py`, `backend/askact/ingest/build.py`, `backend/askact/ingest/__main__.py`, `backend/tests/test_index.py`, `backend/tests/ingest/test_build.py`.
   - *Behaviour:* write `chunks.jsonl`, `embeddings.npy`, `manifest.json` atomically (temp dir then rename); manifest records the pinned source (regulation, CELEX, OJ reference, URL, retrieval date, source `sha256`), counts, chunking params, embedding model, schema version and `build_hash = sha256(source_sha256 + chunking params + embedding model)`; skip re-embedding when the hash matches; `load_index()` raises a clear "run ingestion" error when missing or stale; the CLI prints recital/article/annex/chunk counts and exits non-zero on any failure with no partial output.
@@ -79,7 +79,7 @@ Checkboxes are ticked only after you approve the task.
 - [ ] **Task 9 — Retrieval: reranker and relevance score**
   - *Goal:* the fourth config and the score the relevance gate will use.
   - *Files:* `backend/askact/rerankers.py` (`OverlapReranker` stub, cross-encoder real, selected by `RERANKER`), updates to `retrieval.py`, tests.
-  - *Behaviour:* `hybrid+rerank` reranks the top `RERANK_CANDIDATES` fused candidates; with `RERANKER_ENABLED=false` the reranker is never loaded or called; every result carries `relevance` and `relevance_kind`: the reranker score of rank 1 for `hybrid+rerank`, otherwise the dense cosine of the rank-1 chunk, including for `bm25` and `hybrid`.
+  - *Behaviour:* `hybrid+rerank` reranks the top `RERANK_CANDIDATES` fused candidates; with `RERANKER_ENABLED=false` the reranker is never loaded or called; every result carries `relevance` and `relevance_kind`: the reranker score of rank 1 for `hybrid+rerank`. (The dense-cosine case for `bm25`, `dense` and `hybrid` was implemented in Task 8, because `RetrievalResult` requires the field; this task adds the `rerank` case and extends `Config` and `CONFIGS` to include `hybrid+rerank`.)
   - *Tests:* reranker order applied and not called when disabled (spy); `relevance_kind` is `cosine` for `bm25`/`dense`/`hybrid` and `rerank` for `hybrid+rerank`; cosine for a `bm25` result is computed from the embedder, not from the BM25 score; a `slow` test runs the real reranker on the fixture.
   - *Covers:* R2.4, R2.5 (all four configs), R3.8 (score definition).
 
