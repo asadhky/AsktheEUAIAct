@@ -95,7 +95,7 @@ Checkboxes are ticked only after you approve the task.
   - *Tests:* valid file loads; missing file, malformed YAML, missing `split`, bad `category`, chunk-id style `expected_ids`, non-empty `expected_ids` on `out_of_scope`, empty on in-scope, duplicate ids — each fails with a message naming the entry.
   - *Covers:* R5.1, R5.2, R5.3, R5.4 (the schema and loader; the non-zero exit lands with the CLI in Task 11).
 
-- [ ] **Task 11 — Retrieval metrics and report (`--no-generation`)**
+- [x] **Task 11 — Retrieval metrics and report (`--no-generation`)**
   - *Goal:* hit@k and MRR per retrieval config and split, with no LLM involved.
   - *Files:* `backend/askact/evaluation/metrics.py`, `backend/askact/evaluation/run.py` (`--k`, `--split dev|test|both`, `--configs`, `--no-generation`), `backend/tests/evaluation/test_metrics.py`, `test_run.py`.
   - *Behaviour:* hit = a retrieved chunk whose parent section is in `expected_ids`; hit@k and MRR over in-scope entries only; `out_of_scope` excluded; per config and per split; prints a Markdown table plus a metadata block (date, `k`, models, index `build_hash`, question counts per split) and writes `eval/results.md`; also prints, per config and split, the range of the relevance score for in-scope vs `out_of_scope` questions; default `--split dev`, and a `test` run is labelled FINAL; no table is produced on a validation error: `EvalSetError` from the loader is printed to stderr and the process exits 1 (R5.4).
@@ -103,7 +103,7 @@ Checkboxes are ticked only after you approve the task.
   - *Also in this task:* `--no-generation` is required until Task 19 adds generation metrics (the CLI refuses to run without it, so a table that lacks those columns cannot look complete); a stub run is flagged with a warning in the report; the harness builds its own reranker only when `hybrid+rerank` is selected, whatever `RERANKER_ENABLED` says. `CONFIGS` in `retrieval.py` is now typed `tuple[Config, ...]`. Details in design §3.6.
   - *Covers:* R5.5, R5.6, R5.11 (retrieval columns), R5.12 (table written to file), R5.13.
 
-> **Checkpoint — your turn.** You write `eval/questions.yaml` (hand-written questions, `dev`/`test` split). I then run the retrieval-only eval on `dev` with the real models and show you the real output. We review those numbers together before any generation work starts.
+> **Checkpoint — your turn.** ~~You write `eval/questions.yaml` (hand-written questions, `dev`/`test` split).~~ *At your request the Kiro agent drafted `eval/questions.yaml` (50 questions: 29 dev, 21 test) from the text of the Act without running the retriever; review and edit it before trusting the numbers. How it was made is in the file's header.* I then run the retrieval-only eval on `dev` with the real models and show you the real output. We review those numbers together before any generation work starts.
 
 ---
 
@@ -204,7 +204,7 @@ Checkboxes are ticked only after you approve the task.
 - [ ] **Task 24 — README**
   - *Goal:* the front door of the project.
   - *Files:* `README.md`.
-  - *Content:* architecture diagram (from §1); quick start; configuration pointer to `.env.example`, including the build-time `NEXT_PUBLIC_API_URL` note; the results table pasted from `eval/results.md` (never typed); question counts per split; a statement that the questions were hand-written; a note that small samples mean differences between configs may be noise; the **backend image size and idle memory use** exactly as measured in Task 22, with the measurement method, date and the settings used (or "not measured" if Task 22 could not measure them); the optional manual faithfulness review (N reviewed, how many faithful) only if you actually did one; a limitations section: single pinned document, English Official Journal text only (the HTML rendition, which EUR-Lex says is for information and not the authentic signed PDF), later amendments not reflected and naming Regulation (EU) 2026/1744, retrieval/parsing limits, not legal advice, single worker, non-goals.
+  - *Content:* architecture diagram (from §1); quick start; configuration pointer to `.env.example`, including the build-time `NEXT_PUBLIC_API_URL` note; the results table pasted from `eval/results.md` (never typed); question counts per split; a truthful statement of who wrote the questions (they were drafted by the Kiro agent, not hand-written by the owner, unless the owner has since rewritten them; see the header of `eval/questions.yaml`), which replaces the "hand-written" wording of R7.3 until that requirement is reworded; a note that small samples mean differences between configs may be noise; the **backend image size and idle memory use** exactly as measured in Task 22, with the measurement method, date and the settings used (or "not measured" if Task 22 could not measure them); the optional manual faithfulness review (N reviewed, how many faithful) only if you actually did one; a limitations section: single pinned document, English Official Journal text only (the HTML rendition, which EUR-Lex says is for information and not the authentic signed PDF), later amendments not reflected and naming Regulation (EU) 2026/1744, retrieval/parsing limits, not legal advice, single worker, non-goals.
   - *Covers:* R7.1–R7.6, R5.12.
 
 ---

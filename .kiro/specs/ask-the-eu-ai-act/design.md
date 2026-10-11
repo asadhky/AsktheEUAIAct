@@ -61,7 +61,7 @@ backend/
   tests/  (mirrors the package) + tests/fixtures/
   Dockerfile  pyproject.toml
 frontend/                           Next.js (App Router) + TypeScript, vitest tests
-eval/questions.yaml                 written by the project owner
+eval/questions.yaml                 drafted by the Kiro agent at the owner's request (see its header); owner to review
 eval/results.md                     written by the harness; pasted into the README
 data/{raw,index}/                   generated, gitignored
 docker-compose.yml  .env.example  .dockerignore  .github/workflows/ci.yml  README.md
