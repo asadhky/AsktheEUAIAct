@@ -54,6 +54,21 @@ def test_llm_settings_have_no_default(monkeypatch):
     assert s.llm_price_table == {}
 
 
+@pytest.mark.parametrize("name", ["RELEVANCE_THRESHOLD_COSINE", "RELEVANCE_THRESHOLD_RERANK"])
+@pytest.mark.parametrize("value", ["nan", "NaN", "inf", "-inf", "Infinity"])
+def test_a_threshold_that_is_not_a_finite_number_is_refused_at_startup(monkeypatch, name, value):
+    # `relevance < nan` is always False, so a NaN threshold would silently let every question reach the paid LLM.
+    monkeypatch.setenv(name, value)
+    with pytest.raises(ValidationError, match="finite"):
+        Settings(_env_file=None)
+
+
+@pytest.mark.parametrize("value, expected", [("0", 0.0), ("-0.5", -0.5), ("-12.25", -12.25), ("1e-3", 0.001), ("7", 7.0)])
+def test_any_finite_threshold_is_accepted_including_zero_and_negatives(monkeypatch, value, expected):
+    assert load(monkeypatch, RELEVANCE_THRESHOLD_RERANK=value).relevance_threshold_rerank == expected
+    assert load(monkeypatch, RELEVANCE_THRESHOLD_COSINE=value).relevance_threshold_cosine == expected
+
+
 def test_relevance_thresholds_are_none_until_tuned(monkeypatch):
     s = load(monkeypatch)
     assert s.relevance_threshold_cosine is None
@@ -108,6 +123,7 @@ def test_cors_origins_are_comma_separated(monkeypatch, raw, expected):
 
 def test_api_key_is_kept_out_of_repr(monkeypatch):
     s = load(monkeypatch, LLM_API_KEY="sk-test-not-a-real-key")
+    assert s.llm_api_key is not None
     assert s.llm_api_key.get_secret_value() == "sk-test-not-a-real-key"
     assert "sk-test-not-a-real-key" not in repr(s)
     assert "sk-test-not-a-real-key" not in str(s)
