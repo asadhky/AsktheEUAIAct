@@ -55,7 +55,7 @@ Checkboxes are ticked only after you approve the task.
   - *Tests:* every chunk ≤ limit; long fixture article yields several chunks, each with the article number and title; ids stable across runs; recital stays whole. **`slow`:** over the real source, tokenize every chunk's embed string (header + text, special tokens included) with the real embedder's tokenizer and assert none exceeds the model's max sequence length (read from the loaded model); failure lists the chunk ids. Run it locally and report the result; if it fails, lower `CHUNK_MAX_CHARS` and rerun.
   - *Covers:* R1.8, R1.9.
 
-- [ ] **Task 6 — Embedders (stub and real)**
+- [x] **Task 6 — Embedders (stub and real)**
   - *Goal:* one small interface with a deterministic stub for tests/CI and the real local model.
   - *Files:* `backend/askact/embedders.py` (`HashEmbedder`, `SentenceTransformerEmbedder`, selected by `EMBEDDER=stub|real`), `backend/tests/test_embedders.py`.
   - *Tests:* stub is deterministic, L2-normalised, fixed dimension, and cosine is higher for texts that share words; the stub needs no download; a `slow` test loads the real model, embeds the fixture, and checks shape and normalisation. The query-instruction prefix for BGE is applied to queries only.
