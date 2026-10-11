@@ -29,7 +29,7 @@ from askact.models import RetrievalResult, ScoredChunk, tokenize
 from askact.rerankers import Reranker, checked_scores, get_reranker
 
 Config = Literal["bm25", "dense", "hybrid", "hybrid+rerank"]
-CONFIGS: tuple[Config, ...] = get_args(Config)
+CONFIGS: tuple[str, ...] = get_args(Config)
 
 # Reciprocal Rank Fusion: each ranker gives a chunk 1 / (RRF_K + rank). 60 is the constant from the
 # original paper (Cormack, Clarke and Buettcher, 2009) and is not worth tuning on a small question set.
