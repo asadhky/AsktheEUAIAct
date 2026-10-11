@@ -388,18 +388,20 @@ def test_real_source_numbering_has_no_gaps(real_act):
     verify(real_act, real_act.counts)  # counts trivially match; this checks the 1..n / I..n numbering
 
 
+def test_the_pinned_counts_are_those_confirmed_by_the_project_owner():
+    """Changing these means changing the pinned document; it must be a deliberate edit."""
+    assert parse.EXPECTED_COUNTS == Counts(recitals=180, articles=113, annexes=13)
+
+
 @real_source
 def test_real_source_has_the_pinned_counts(real_act):
-    if parse.EXPECTED_COUNTS is None:
-        pytest.skip("EXPECTED_COUNTS has not been confirmed yet")
-    assert real_act.counts == parse.EXPECTED_COUNTS
-    verify(real_act)
+    assert real_act.counts == Counts(recitals=180, articles=113, annexes=13)
+    verify(real_act)  # uses EXPECTED_COUNTS: counts and gap-free numbering
 
 
 @pytest.mark.skipif(not MANUAL.exists(), reason=f"no manually downloaded copy at {MANUAL}")
 def test_a_manually_downloaded_copy_goes_through_the_same_parser_and_pin_check():
-    act = parse_act(MANUAL.read_bytes())
-    verify(act, act.counts)  # numbering and structure; the pinned counts are checked in the test above
+    verify(parse_act(MANUAL.read_bytes()))  # the pinned counts, not just whatever it contains
 
 
 @real_source
