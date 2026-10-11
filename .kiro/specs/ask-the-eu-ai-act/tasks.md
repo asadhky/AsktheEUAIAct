@@ -109,7 +109,7 @@ Checkboxes are ticked only after you approve the task.
 
 ## C. Generation and safety
 
-- [ ] **Task 12 — LLM interface, fake provider, prompt, response parsing**
+- [x] **Task 12 — LLM interface, fake provider, prompt, response parsing**
   - *Goal:* the provider-agnostic seam, testable without any network.
   - *Files:* `backend/askact/generation/llm.py` (`LLMReply`, `complete(system, user, max_output_tokens)`, `FakeLLM` that scripts replies and counts calls, `get_llm(settings)` factory keyed on `LLM_PROVIDER`), `backend/askact/generation/prompt.py` (system prompt, passages labelled by section id), response parser, tests.
   - *Behaviour:* the parser reads `{answer, citations, covered}` JSON, tolerating a code fence; anything else raises `llm_bad_output`; the factory raises `llm_unavailable` for an unset or unknown provider. **Scope change:** the "missing key/model" check moves to Task 14, because the only provider built here (`fake`) needs neither. The parser is in `generation/response.py` (the task text left its file open). Details in design §3.3.
@@ -119,6 +119,7 @@ Checkboxes are ticked only after you approve the task.
 - [ ] **Task 13 — Answer pipeline: gate, call, validate**
   - *Goal:* `answer()` implements the grounding rules.
   - *Files:* `backend/askact/generation/answer.py`, tests.
+  - *Also in this task:* `Settings` now refuses `nan`/`inf` relevance thresholds (a NaN threshold silently disabled the gate), and a new `not_configured` (503) error code is added to the API table for an unset or non-finite threshold. Reconciliation happens right after the call returns, before parsing. Details in design §3.3.
   - *Behaviour (order from §3.3):* choose the threshold by `relevance_kind`; below it → `not_covered` with zero LLM calls; otherwise reserve spend through a small `SpendGuard` protocol (tests use a double; the real ledger arrives in Task 16), call the LLM, parse, drop citations not in the retrieved set, treat `covered=false` or no valid citation as `not_covered`, return sources for cited sections.
   - *Tests (fake LLM):* normal answer with sources; invented citation dropped; `covered=true` with no valid citation → `not_covered`; `covered=false` → `not_covered`; gate refusal makes zero LLM calls and no reservation, for both the cosine and the rerank threshold; a `None` threshold fails with a clear configuration error rather than silently passing.
   - *Covers:* R3.1, R3.4, R3.5, R3.6, R3.7, R3.8, R3.11.
@@ -140,7 +141,7 @@ Checkboxes are ticked only after you approve the task.
 
 - [ ] **Task 16 — Spend ledger**
   - *Goal:* the daily cap that fails closed.
-  - *Files:* `backend/askact/guards/spend.py` (implements the `SpendGuard` protocol from Task 13), tests.
+  - *Files:* `backend/askact/guards/spend.py` (implements the `SpendGuard` / `SpendReservation` protocols from Task 13: `reserve(system, user, max_output_tokens)` returns a reservation whose `reconcile(input_tokens, output_tokens)` takes `None` for unreported usage and should not raise; a refusal raises `SpendRefusedError`), tests.
   - *Behaviour:* SQLite `spend(day, micro_usd)`, UTC day; reserve `(estimated_input_tokens + MAX_OUTPUT_TOKENS) × price` in one `BEGIN IMMEDIATE` transaction and refuse if the total would exceed `DAILY_SPEND_CAP_USD`; reconcile to actual cost on the reservation's day; reservation stands if usage is missing or reconciliation never happens; unreadable/unwritable DB, model missing from `LLM_PRICE_TABLE`, or an unparsable table → refuse; integer micro-dollars, rounded up.
   - *Tests:* reserve and refuse at the cap; reconcile up and down; persistence across a reopened DB; new day starts at zero; call straddling midnight reconciles on the right day; usage missing → reservation stands; unwritable path, missing price entry, bad table → refused; two concurrent reservations cannot both pass when only one fits.
   - *Covers:* R6.6, R6.7, R6.8, R6.9, R6.10.

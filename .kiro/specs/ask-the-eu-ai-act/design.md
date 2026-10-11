@@ -179,6 +179,14 @@ class Retriever:
 6. `covered=false` → `not_covered` (R3.6).
 7. **Sources** returned = the retrieved chunks whose section is cited, with section id, label ("Article 5"), title, text, and score (R3.11).
 
+**As built (Task 13; `generation/answer.py`):**
+- **Order and what each refusal costs.** The gate runs first and a refused question makes no LLM call and no reservation. Then: prompt, `spend.reserve`, the call, `reservation.reconcile`, parse, validate. **Reconciling happens right after the call returns, before parsing**, because a reply that turns out to be unusable has still used tokens. If the call itself raises, nothing is reconciled and the reservation stands as the charge (R6.9).
+- **`SpendGuard` is two tiny protocols** so the real ledger (Task 16) is a drop-in: `reserve(system, user, max_output_tokens)` returns a reservation, and `reservation.reconcile(input_tokens, output_tokens)` settles it (`None` means usage was not reported). The reservation carries its own day and amount, which is what makes "reconcile on the reservation's day" (a call can straddle midnight) need no extra bookkeeping. A refusal is `SpendRefusedError`, whose `code` is `spend_cap_reached`. If `reconcile` raises, the error is logged (the exception type only) and the reply is kept: R6.9 says the reservation then stands, not that a paid-for answer is thrown away.
+- **An unset or non-finite threshold is an error, not a default.** `GateNotConfiguredError` (`code="not_configured"`, new in the table above) is raised for the threshold that applies. Only the one for the active kind has to be set. `Settings` also refuses `nan` and `inf` at startup (they were accepted before): `relevance < nan` is always False, so a NaN threshold would silently send every question to the paid LLM. The gate checks again itself, because a `Settings` can be built or copied in code without validation. Any finite number is allowed, including negatives, since rerank scores can be negative.
+- **A refusal never carries model text.** Every `not_covered` result (gate, the model's `covered=false`, or no valid citation) has the fixed message `NOT_COVERED_MESSAGE` and empty citations and sources. The model's explanation in the `covered=false` case is discarded.
+- **Citations** are normalised with `SectionId.parse` ("Article 5" -> `article:5`), de-duplicated, kept in the order first cited, and dropped unless the section is among the retrieved chunks; text that is not a section id is dropped without failing the answer. **Sources** are the retrieved chunks of the cited sections, best first (not in citation order), and include every retrieved chunk of a cited section.
+- **`AnswerResult.usage`** is the provider's reported token counts for the one call made, or `None` if no call was made, so the API's one log line (§3.4) and the eval's cost accounting can read it.
+
 **Provider adapters** (`generation/llm.py`): one tiny interface, `complete(system, user, max_output_tokens) -> LLMReply(text, input_tokens | None, output_tokens | None)`, with two implementations selected by `LLM_PROVIDER`:
 - `openai`: Chat Completions over `httpx`; `LLM_BASE_URL` can point to any OpenAI-compatible server.
 - `fake`: scripted replies for tests/CI; counts its calls.
@@ -217,6 +225,7 @@ Errors use `{"error": {"code": "...", "message": "..."}}`:
 | `llm_unavailable` | 503 | provider, model, or key missing/invalid |
 | `llm_bad_output` | 502 | reply is not the required structure |
 | `index_unavailable` | 503 | index missing or stale |
+| `not_configured` | 503 | the relevance threshold for the active retrieval config is unset or not a finite number (answering is unusable until Task 20 tunes it) |
 
 **Order of checks in `/ask`:** length → rate limit → retrieve → relevance gate → spend reservation → LLM → validate → reconcile. Everything cheap and free runs before anything that costs money.
 
