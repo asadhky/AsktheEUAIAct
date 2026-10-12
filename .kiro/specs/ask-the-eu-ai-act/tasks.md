@@ -116,7 +116,7 @@ Checkboxes are ticked only after you approve the task.
   - *Tests:* prompt labels passages by section id and states the grounding/JSON rules; parser accepts valid and fenced JSON, rejects prose, a missing field and a wrong type; `FakeLLM` scripting and call counting; factory errors.
   - *Covers:* R3.1 (prompt), R3.2, R3.3, R3.9 (selection by env), R3.10 (unset/unknown provider; missing key/model in Task 14), R6.12 (max-token parameter in the interface).
 
-- [ ] **Task 13 — Answer pipeline: gate, call, validate**
+- [x] **Task 13 — Answer pipeline: gate, call, validate**
   - *Goal:* `answer()` implements the grounding rules.
   - *Files:* `backend/askact/generation/answer.py`, tests.
   - *Also in this task:* `Settings` now refuses `nan`/`inf` relevance thresholds (a NaN threshold silently disabled the gate), and a new `not_configured` (503) error code is added to the API table for an unset or non-finite threshold. Reconciliation happens right after the call returns, before parsing. Details in design §3.3.
@@ -130,6 +130,7 @@ Checkboxes are ticked only after you approve the task.
   - *Files:* adapter in `generation/llm.py` (or its own module if it grows), tests.
   - *Behaviour:* Chat Completions over `httpx` with the current output-token parameter; `LLM_BASE_URL` override; extract text and usage; auth/limit/model errors → `llm_unavailable`; **a missing `LLM_API_KEY` or `LLM_MODEL` is `llm_unavailable` when the provider is built** (moved here from Task 12), with a message that names the variable and never contains the key.
   - *Tests:* request building and response/usage parsing via `httpx.MockTransport`; missing usage returns `None` counts; error mapping; **provider switch:** `get_llm(settings)` returns the fake provider for `LLM_PROVIDER=fake` and the OpenAI adapter for `LLM_PROVIDER=openai` with no other change, and rejects any other value (including `anthropic`) with the `llm_unavailable` configuration error. **`slow`/manual live smoke test:** one tiny real call, asserts a non-empty reply and reported usage; skipped without the key. Run once locally if you provide a key, and report the result.
+  - *Also in this task:* the adapter is in its own module, `generation/openai_adapter.py`, registered in the `get_llm` factory (imported lazily, because it imports `llm.py`). Sent: `max_completion_tokens` (never the deprecated `max_tokens`), a `system` message, no optional parameters, no retries, no redirects. A 429 is split into rate-limit versus out-of-credit. The live smoke test calls with a 256-token cap (not tiny: a reasoning model spends part of the budget on hidden reasoning) and also asserts the cap was honoured. Details and trade-offs in design §3.3.
   - *Covers:* R3.9, R3.10, R6.12.
 
 - [ ] **Task 15 — Rate limiter**
