@@ -21,8 +21,9 @@ DEFAULT_SOURCE_URL = "https://publications.europa.eu/resource/celex/32024R1689"
 class ModelPrice(BaseModel):
     """USD per million tokens. Real prices are the operator's responsibility; the repo has none."""
 
-    input_per_mtok: float = Field(ge=0)
-    output_per_mtok: float = Field(ge=0)
+    # allow_inf_nan=False: an infinite price (JSON `1e999` parses to inf) would make every reservation infinite.
+    input_per_mtok: float = Field(ge=0, allow_inf_nan=False)
+    output_per_mtok: float = Field(ge=0, allow_inf_nan=False)
 
 
 class Settings(BaseSettings):
@@ -72,7 +73,8 @@ class Settings(BaseSettings):
     max_question_chars: int = Field(500, gt=0)
     rate_limit_per_minute: int = Field(10, gt=0)
     trusted_proxy_header: str | None = None
-    daily_spend_cap_usd: float = Field(1.00, ge=0)
+    # allow_inf_nan=False: `inf` (or `1e999`, which overflows to it) would make the cap infinite, i.e. no cap at all.
+    daily_spend_cap_usd: float = Field(1.00, ge=0, allow_inf_nan=False)
     spend_db_path: Path = Path("/var/lib/askact/spend.sqlite3")
     # NoDecode: take the raw string, so the .env value can be a plain comma-separated list.
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
