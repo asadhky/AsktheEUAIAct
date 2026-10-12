@@ -141,17 +141,17 @@ def test_no_provider_is_an_llm_unavailable_error_that_names_the_variable(provide
         get_llm(settings(provider))
     assert info.value.code == "llm_unavailable"
     assert "LLM_PROVIDER is not set" in str(info.value)
-    assert "fake" in str(info.value)  # and what it could be set to
+    assert "fake, openai" in str(info.value)  # and what it could be set to
 
 
-@pytest.mark.parametrize("provider", ["anthropic", "gemini", "not-a-provider", "fake2", "fake;"])
+@pytest.mark.parametrize("provider", ["anthropic", "gemini", "not-a-provider", "fake2", "fake;", "openai2", "open ai"])
 def test_an_unknown_provider_is_an_llm_unavailable_error_listing_the_supported_ones(provider):
     with pytest.raises(LLMUnavailableError) as info:
         get_llm(settings(provider))
     message = str(info.value)
     assert info.value.code == "llm_unavailable"
     assert f"{provider!r} is not supported" in message
-    assert "use one of: fake" in message
+    assert "use one of: fake, openai" in message
 
 
 def test_the_provider_is_read_from_the_environment(monkeypatch):
