@@ -54,6 +54,35 @@ def test_llm_settings_have_no_default(monkeypatch):
     assert s.llm_price_table == {}
 
 
+@pytest.mark.parametrize("value", ["inf", "Infinity", "1e999", "nan"])
+def test_a_spend_cap_that_is_not_a_finite_number_is_refused_at_startup(monkeypatch, value):
+    # An infinite cap (or 1e999, which overflows to it) would mean no cap at all.
+    monkeypatch.setenv("DAILY_SPEND_CAP_USD", value)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+@pytest.mark.parametrize("value, expected", [("0", 0.0), ("0.5", 0.5), ("1.00", 1.0), ("250", 250.0)])
+def test_any_finite_non_negative_spend_cap_is_accepted_including_zero(monkeypatch, value, expected):
+    assert load(monkeypatch, DAILY_SPEND_CAP_USD=value).daily_spend_cap_usd == expected
+
+
+@pytest.mark.parametrize("field", ["input_per_mtok", "output_per_mtok"])
+@pytest.mark.parametrize("value", ["1e999", "Infinity", "NaN"])
+def test_a_price_that_is_not_a_finite_number_is_refused_at_startup(monkeypatch, field, value):
+    prices = {"input_per_mtok": "1", "output_per_mtok": "1", field: value}
+    table = "{\"m\": {" + ", ".join(f'"{k}": {v}' for k, v in prices.items()) + "}}"
+    monkeypatch.setenv("LLM_PRICE_TABLE", table)
+    with pytest.raises((ValidationError, SettingsError)):
+        Settings(_env_file=None)
+
+
+def test_a_price_of_zero_is_accepted_for_a_free_model(monkeypatch):
+    table = '{"local": {"input_per_mtok": 0, "output_per_mtok": 0}}'
+    price = load(monkeypatch, LLM_PRICE_TABLE=table).llm_price_table["local"]
+    assert (price.input_per_mtok, price.output_per_mtok) == (0.0, 0.0)
+
+
 @pytest.mark.parametrize("name", ["RELEVANCE_THRESHOLD_COSINE", "RELEVANCE_THRESHOLD_RERANK"])
 @pytest.mark.parametrize("value", ["nan", "NaN", "inf", "-inf", "Infinity"])
 def test_a_threshold_that_is_not_a_finite_number_is_refused_at_startup(monkeypatch, name, value):
