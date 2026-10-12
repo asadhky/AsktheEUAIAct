@@ -141,7 +141,7 @@ Checkboxes are ticked only after you approve the task.
   - *Also in this task:* `client_key` takes the header as a list of lines and uses the last entry of the last line; an unusable header falls back to the socket address; IPv6 is keyed by /64 and IPv4-mapped addresses are folded onto IPv4; `Retry-After` is exact and at least 1 (a floating-point case would otherwise give 0). It is framework-free (FastAPI arrives in Task 18). Details in design §3.4.
   - *Covers:* R6.5.
 
-- [ ] **Task 16 — Spend ledger**
+- [x] **Task 16 — Spend ledger**
   - *Goal:* the daily cap that fails closed.
   - *Files:* `backend/askact/guards/spend.py` (implements the `SpendGuard` / `SpendReservation` protocols from Task 13: `reserve(system, user, max_output_tokens)` returns a reservation whose `reconcile(input_tokens, output_tokens)` takes `None` for unreported usage and should not raise; a refusal raises `SpendRefusedError`), tests.
   - *Behaviour:* SQLite `spend(day, micro_usd)`, UTC day; reserve `(estimated_input_tokens + MAX_OUTPUT_TOKENS) × price` in one `BEGIN IMMEDIATE` transaction and refuse if the total would exceed `DAILY_SPEND_CAP_USD`; reconcile to actual cost on the reservation's day; reservation stands if usage is missing or reconciliation never happens; unreadable/unwritable DB, model missing from `LLM_PRICE_TABLE`, or an unparsable table → refuse; integer micro-dollars, rounded up.
@@ -154,6 +154,7 @@ Checkboxes are ticked only after you approve the task.
   - *Files:* `backend/askact/request_log.py`, tests.
   - *Behaviour:* one structured line per `/ask` with outcome, retrieval config, latency, and input/output token counts (or null); never the question, answer, passages or client address; exception handlers log the code and exception type only; `LOG_QUESTIONS=true` adds only the question.
   - *Tests (`caplog`):* line contains the expected fields; a distinctive question string never appears in any captured log, including on error paths; the client address never appears; `LOG_QUESTIONS=true` adds only the question.
+  - *Also in this task:* the line is a single ASCII JSON object (a question with a newline could otherwise forge a second log line); outcome, config and error type are validated against closed sets, so free text cannot be passed as one; `describe_error(exc)` gives the code and type name only; `internal_error` is added to the outcome set; the logged question is cut at 1000 characters; tests parse the backend with `ast` to keep tracebacks and templated log messages out of the request path. **For Task 18:** call `log_request` once per `/ask` on every path, pass `include_question=settings.log_questions`, and map `IndexUnavailableError` to `index_unavailable` yourself. **For Task 22:** `--no-access-log`, and do not publish the backend's port. Details in design §3.4.
   - *Covers:* design-level logging decision (§3.4); no requirement.
 
 - [ ] **Task 18 — FastAPI app**
