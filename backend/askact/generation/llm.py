@@ -90,11 +90,19 @@ class FakeLLM:
         return item if isinstance(item, LLMReply) else LLMReply(item)
 
 
+def _openai(settings: Settings) -> LLM:
+    # Imported here because the adapter module imports this one (for LLMReply and the errors).
+    from askact.generation.openai_adapter import OpenAIChat
+
+    return OpenAIChat.from_settings(settings)
+
+
 # Provider name (as written in LLM_PROVIDER) -> how to build it. Adding a provider is one line here.
 # A fake with an empty script is what LLM_PROVIDER=fake gives: it is there to be replaced by a scripted
 # one in tests, and complains if it is called without a script.
 _PROVIDERS: dict[str, Callable[[Settings], LLM]] = {
     "fake": lambda settings: FakeLLM(),
+    "openai": _openai,
 }
 
 
