@@ -133,7 +133,7 @@ Checkboxes are ticked only after you approve the task.
   - *Also in this task:* the adapter is in its own module, `generation/openai_adapter.py`, registered in the `get_llm` factory (imported lazily, because it imports `llm.py`). Sent: `max_completion_tokens` (never the deprecated `max_tokens`), a `system` message, no optional parameters, no retries, no redirects. A 429 is split into rate-limit versus out-of-credit. The live smoke test calls with a 256-token cap (not tiny: a reasoning model spends part of the budget on hidden reasoning) and also asserts the cap was honoured. Details and trade-offs in design §3.3.
   - *Covers:* R3.9, R3.10, R6.12.
 
-- [ ] **Task 15 — Rate limiter**
+- [x] **Task 15 — Rate limiter**
   - *Goal:* bound requests per client.
   - *Files:* `backend/askact/guards/ratelimit.py`, tests.
   - *Behaviour:* in-process sliding window per client key; key = socket peer, or the last entry of `TRUSTED_PROXY_HEADER` when set; empty windows pruned; returns `Retry-After`.
@@ -146,6 +146,7 @@ Checkboxes are ticked only after you approve the task.
   - *Files:* `backend/askact/guards/spend.py` (implements the `SpendGuard` / `SpendReservation` protocols from Task 13: `reserve(system, user, max_output_tokens)` returns a reservation whose `reconcile(input_tokens, output_tokens)` takes `None` for unreported usage and should not raise; a refusal raises `SpendRefusedError`), tests.
   - *Behaviour:* SQLite `spend(day, micro_usd)`, UTC day; reserve `(estimated_input_tokens + MAX_OUTPUT_TOKENS) × price` in one `BEGIN IMMEDIATE` transaction and refuse if the total would exceed `DAILY_SPEND_CAP_USD`; reconcile to actual cost on the reservation's day; reservation stands if usage is missing or reconciliation never happens; unreadable/unwritable DB, model missing from `LLM_PRICE_TABLE`, or an unparsable table → refuse; integer micro-dollars, rounded up.
   - *Tests:* reserve and refuse at the cap; reconcile up and down; persistence across a reopened DB; new day starts at zero; call straddling midnight reconciles on the right day; usage missing → reservation stands; unwritable path, missing price entry, bad table → refused; two concurrent reservations cannot both pass when only one fits.
+  - *Also in this task:* the input-token estimate uses UTF-8 bytes (not characters) divided by 3, which reserves more for non-English text; money is computed in `Decimal` (floats overcharge, e.g. `1.1 x 100`); `Settings` refuses an infinite or NaN cap and prices (an infinite cap meant no cap); any failure inside the ledger is a refusal, with no path, SQL text or chained exception in the message. Details in design §3.4.
   - *Covers:* R6.6, R6.7, R6.8, R6.9, R6.10.
 
 - [ ] **Task 17 — Request logging**
