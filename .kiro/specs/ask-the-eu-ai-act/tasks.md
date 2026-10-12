@@ -124,7 +124,7 @@ Checkboxes are ticked only after you approve the task.
   - *Tests (fake LLM):* normal answer with sources; invented citation dropped; `covered=true` with no valid citation → `not_covered`; `covered=false` → `not_covered`; gate refusal makes zero LLM calls and no reservation, for both the cosine and the rerank threshold; a `None` threshold fails with a clear configuration error rather than silently passing.
   - *Covers:* R3.1, R3.4, R3.5, R3.6, R3.7, R3.8, R3.11.
 
-- [ ] **Task 14 — OpenAI adapter**
+- [x] **Task 14 — OpenAI adapter**
   - *Goal:* the one real provider (OpenAI, by your choice; no other real adapter is built), plus the proof that the provider is chosen by env var.
   - *Process:* **read OpenAI's current API docs first**; record the doc URL and read date in a comment at the top of the adapter.
   - *Files:* adapter in `generation/llm.py` (or its own module if it grows), tests.
@@ -138,6 +138,7 @@ Checkboxes are ticked only after you approve the task.
   - *Files:* `backend/askact/guards/ratelimit.py`, tests.
   - *Behaviour:* in-process sliding window per client key; key = socket peer, or the last entry of `TRUSTED_PROXY_HEADER` when set; empty windows pruned; returns `Retry-After`.
   - *Tests (injected clock):* allows up to the limit and refuses the next; window slides; separate keys independent; header parsing takes the last entry and ignores spoofed earlier ones; memory pruned.
+  - *Also in this task:* `client_key` takes the header as a list of lines and uses the last entry of the last line; an unusable header falls back to the socket address; IPv6 is keyed by /64 and IPv4-mapped addresses are folded onto IPv4; `Retry-After` is exact and at least 1 (a floating-point case would otherwise give 0). It is framework-free (FastAPI arrives in Task 18). Details in design §3.4.
   - *Covers:* R6.5.
 
 - [ ] **Task 16 — Spend ledger**
