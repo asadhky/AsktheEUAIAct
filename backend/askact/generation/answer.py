@@ -97,8 +97,9 @@ class AnswerResult(BaseModel):
     usage: Usage | None  # None if no LLM call was made (the gate refused first)
 
 
-def _threshold(settings: Settings, kind: Literal["cosine", "rerank"]) -> float:
-    """The relevance threshold for this kind of score, or GateNotConfiguredError."""
+def relevance_threshold(settings: Settings, kind: Literal["cosine", "rerank"]) -> float:
+    """The relevance threshold for this kind of score, or GateNotConfiguredError. Public because the evaluation
+    checks it before its first paid call instead of discovering a missing one half way through."""
     name, value = (
         ("RELEVANCE_THRESHOLD_COSINE", settings.relevance_threshold_cosine)
         if kind == "cosine"
@@ -133,7 +134,7 @@ def _valid_citations(cited: list[str], retrieved: set[SectionId]) -> list[Sectio
 
 
 def answer(question: str, result: RetrievalResult, settings: Settings, llm: LLM, spend: SpendGuard) -> AnswerResult:
-    threshold = _threshold(settings, result.relevance_kind)
+    threshold = relevance_threshold(settings, result.relevance_kind)
     if result.relevance < threshold:
         return _not_covered(usage=None)
 

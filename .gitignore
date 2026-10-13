@@ -26,3 +26,6 @@ data/index/
 # Kiro local settings (may contain tokens; check the exact folder name)
 .kiro/settings/
 
+
+# Evaluation: cached LLM replies (eval/.cache/llm.jsonl); paid for, so keep locally, never commit
+eval/.cache/
