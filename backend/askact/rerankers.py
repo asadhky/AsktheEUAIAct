@@ -53,7 +53,12 @@ class OverlapReranker:
 
 
 class CrossEncoderReranker:
-    """A sentence-transformers cross-encoder run locally on the CPU. Needs the `models` extra.
+    """A sentence-transformers cross-encoder run locally. Needs the `models` extra.
+
+    The device is left to sentence-transformers (CPU, or the GPU/Apple Silicon chip if there is one). It was forced to
+    the CPU at first; the owner reported NaN scores on Apple Silicon with that setting, and removing it fixed them
+    (not reproduced in the Linux/CPU development sandbox). Scores on both are the same to the 3 decimals the
+    evaluation prints (checked on all four configs of both splits), so the tuned threshold holds on either.
 
     Scores are the model's raw logits, which `predict()` returns unchanged in every sentence-transformers
     version tested (3.4.1 to 6.1.0). A slow test pins that, because the relevance threshold for reranked
@@ -72,7 +77,7 @@ class CrossEncoderReranker:
                 "or set RERANKER=stub to use the test stub."
             ) from exc
         try:
-            # CPU on purpose: the model is small and only about twenty passages are scored per question.
+            # No `device=`: let sentence-transformers choose. Forcing "cpu" gave NaN scores on Apple Silicon.
             self._model: Any = CrossEncoder(model_name)
         except Exception as exc:  # network failure, unknown model name, corrupt cache, ...
             raise RerankerError(
