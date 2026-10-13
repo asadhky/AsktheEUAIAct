@@ -1,0 +1,10 @@
+# frontend/Dockerfile is built with ./frontend as its context. Allowlist again: no node_modules, no build output, no
+# tests, and nothing from the repository root (so no .env) can get in.
+*
+!package.json
+!package-lock.json
+!tsconfig.json
+!next.config.mjs
+!app
+!lib
+**/*.tsbuildinfo

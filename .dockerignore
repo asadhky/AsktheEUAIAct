@@ -1,0 +1,11 @@
+# The backend image is built with the repository root as its context (backend/Dockerfile). This file is an
+# ALLOWLIST: everything is left out except what the image needs, so a secret or a large directory can never be sent
+# to the builder or copied into an image by accident. In particular `.env` (real keys) is never in the context.
+*
+!backend/pyproject.toml
+!backend/askact
+# Optional: a manually downloaded copy of the Act, used if the build cannot fetch it (data/raw is gitignored, so on
+# a clean clone there is none, and the build fetches the text itself).
+!data/raw/*.html
+**/__pycache__
+**/*.pyc
