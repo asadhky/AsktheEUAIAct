@@ -29,6 +29,7 @@ from askact.retrieval import (
     Config,
     Retriever,
     app_config,
+    relevance_kind,
     rrf,
     tokenize,
 )
@@ -419,6 +420,18 @@ def test_a_rerank_relevance_can_be_negative_like_a_cross_encoder_logit():
     retriever, _ = reranked_retriever(SpyReranker(default=-11.0))
     result = retriever.search("zeta", "hybrid+rerank", k=2)
     assert result.relevance == -11.0 and result.relevance_kind == "rerank"
+
+
+@pytest.mark.parametrize("config", CONFIGS)
+def test_relevance_kind_of_a_config_is_what_its_searches_report(config):
+    # The evaluation asks this before searching (to check the right threshold is set); it must agree with search().
+    retriever, _ = reranked_retriever(SpyReranker(default=7.0))
+    assert relevance_kind(config) == retriever.search("zeta", config, k=2).relevance_kind
+
+
+def test_only_hybrid_rerank_is_on_the_rerank_scale():
+    assert {config: relevance_kind(config) for config in CONFIGS} == {
+        "bm25": "cosine", "dense": "cosine", "hybrid": "cosine", "hybrid+rerank": "rerank"}
 
 
 @pytest.mark.parametrize("config", NON_RERANK)

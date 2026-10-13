@@ -41,6 +41,11 @@ HYBRID_CANDIDATES = 30
 RERANK_CANDIDATES = 20
 
 
+def relevance_kind(config: Config) -> Literal["cosine", "rerank"]:
+    """Which scale a config's `relevance` is on: the reranker's own score for hybrid+rerank, cosine for the rest."""
+    return "rerank" if config == "hybrid+rerank" else "cosine"
+
+
 def app_config(settings: Settings) -> Config:
     """The config the running app uses: reranked hybrid if RERANKER_ENABLED, otherwise plain hybrid (R2.4).
 
@@ -140,7 +145,7 @@ class Retriever:
 
         if config == "hybrid+rerank":
             ranked = self._rerank(query, cosines, k)
-            relevance, kind = ranked[0][1], "rerank"
+            relevance = ranked[0][1]
         else:
             if config == "dense":
                 ranked = [(i, float(cosines[i])) for i in _best_first(cosines, k)]
@@ -149,12 +154,12 @@ class Retriever:
                 ranked = [(i, float(bm25[i])) for i in _best_first(bm25, k)]
             else:
                 ranked = self._hybrid(query, cosines, k)
-            relevance, kind = float(cosines[ranked[0][0]]), "cosine"
+            relevance = float(cosines[ranked[0][0]])
 
         return RetrievalResult(
             chunks=[ScoredChunk(chunk=self._index.chunks[i], score=score) for i, score in ranked],
             relevance=relevance,
-            relevance_kind=kind,
+            relevance_kind=relevance_kind(config),
         )
 
     def _hybrid(self, query: str, cosines: Vectors, k: int) -> list[tuple[int, float]]:

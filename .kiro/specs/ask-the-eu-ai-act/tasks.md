@@ -157,7 +157,7 @@ Checkboxes are ticked only after you approve the task.
   - *Also in this task:* the line is a single ASCII JSON object (a question with a newline could otherwise forge a second log line); outcome, config and error type are validated against closed sets, so free text cannot be passed as one; `describe_error(exc)` gives the code and type name only; `internal_error` is added to the outcome set; the logged question is cut at 1000 characters; tests parse the backend with `ast` to keep tracebacks and templated log messages out of the request path. **For Task 18:** call `log_request` once per `/ask` on every path, pass `include_question=settings.log_questions`, and map `IndexUnavailableError` to `index_unavailable` yourself. **For Task 22:** `--no-access-log`, and settle how the backend is reached (see Task 22). Details in design §3.4.
   - *Covers:* design-level logging decision (§3.4); no requirement.
 
-- [ ] **Task 18 — FastAPI app**
+- [x] **Task 18 — FastAPI app**
   - *Goal:* wire everything into `POST /ask` and `GET /health`.
   - *Files:* `backend/askact/api.py`, `backend/tests/test_api.py`.
   - *Behaviour:* order of checks from §3.4: length → rate limit → retrieve → gate → spend reservation → LLM → validate → reconcile; response and error shapes from §3.4; startup recomputes the build hash and refuses to serve a missing/stale index (`index_unavailable`); CORS from `CORS_ORIGINS`; uvicorn started with `--no-access-log` and a single worker.
@@ -174,6 +174,7 @@ Checkboxes are ticked only after you approve the task.
   - *Files:* `backend/askact/evaluation/cache.py`, extensions to `metrics.py` and `run.py`, tests; add `eval/.cache/` to `.gitignore`.
   - *Behaviour:* run the real `answer()` pipeline per config; refusal accuracy over `out_of_scope` (refused = gate fires, or `covered=false`, or all citations dropped); citation precision and recall over in-scope entries (no citations → 0 for both); cache keyed by `sha256(provider, model, system, user, max_output_tokens)` in JSON lines; `EVAL_MAX_LLM_CALLS` counts only uncached calls and aborts before exceeding it, printing no generation metrics from an incomplete run; both splits reported; table extended and written to `eval/results.md`.
   - *Tests (fake LLM):* hand-computed precision/recall including multi-id and empty citations; refusal accuracy for each refusal path; cache hit avoids a call; a changed question, passage or model misses the cache; the cap aborts cleanly with no partial generation numbers; `--no-generation` still works unchanged.
+  - *Also in this task (details in design §3.6, "As built for generation"):* an unreadable model reply scores as no answer (not a refusal) and is counted per config, while a provider outage aborts the run; the thresholds, provider and cache are checked before the first paid call; the eval uses a no-op spend guard, bounded by the call cap; `LLM_PROVIDER=fake` is refused with a message; `answer.relevance_threshold` is public and `retrieval.relevance_kind` is the one config-to-scale mapping. **Not verified here:** a live run (no key; thresholds unset until Task 20) and the real models (not available in this sandbox).
   - *Covers:* R5.7, R5.8, R5.9, R5.11.
 
 - [ ] **Task 20 — Tune thresholds on dev; final test run** *(needs your LLM key and budget approval)*

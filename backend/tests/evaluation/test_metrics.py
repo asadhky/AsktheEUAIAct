@@ -2,7 +2,16 @@ import dataclasses
 
 import pytest
 
-from askact.evaluation.metrics import RetrievalScores, first_hit_rank, score_ranks
+from askact.evaluation.metrics import (
+    CitationScores,
+    RefusalScores,
+    RetrievalScores,
+    citation_precision_recall,
+    first_hit_rank,
+    score_citations,
+    score_ranks,
+    score_refusals,
+)
 from askact.models import SectionId
 
 
@@ -129,3 +138,85 @@ def test_scores_cannot_be_changed():
     with pytest.raises(dataclasses.FrozenInstanceError):
         scores.hits = 5  # type: ignore[misc]
     assert isinstance(scores, RetrievalScores)
+
+
+# =====================================================================================================
+# Generation metrics: citation precision / recall and refusal accuracy
+# =====================================================================================================
+
+@pytest.mark.parametrize(
+    "cited, expected, precision, recall",
+    [
+        (["article:5"], ["article:5"], 1.0, 1.0),
+        # One of two citations is expected: precision 1/2; the one expected section is cited: recall 1.
+        (["article:5", "article:9"], ["article:5"], 0.5, 1.0),
+        # The one citation is expected (precision 1), but only one of two expected sections is cited (recall 1/2).
+        (["article:5"], ["article:5", "article:6"], 1.0, 0.5),
+        # 1 right of 2 cited; 1 of 3 expected found.
+        (["article:5", "article:9"], ["article:5", "article:6", "article:7"], 0.5, 1 / 3),
+        # Both expected sections cited, plus one that is not: 2/3 precision, full recall.
+        (["article:6", "article:5", "recital:1"], ["article:5", "article:6"], 2 / 3, 1.0),
+        # Nothing cited is expected.
+        (["article:9"], ["article:5"], 0.0, 0.0),
+        # An article and an annex with the same number are different sections.
+        (["annex:III"], ["article:3"], 0.0, 0.0),
+    ],
+)
+def test_citation_precision_and_recall_by_hand(cited, expected, precision, recall):
+    got = citation_precision_recall(ids(*cited), ids(*expected))
+    assert got == (pytest.approx(precision), pytest.approx(recall))
+
+
+def test_an_answer_without_citations_scores_zero_on_both():
+    assert citation_precision_recall([], ids("article:5", "article:6")) == (0.0, 0.0)
+
+
+def test_citing_a_section_twice_does_not_change_the_score():
+    # Without de-duplication this would be precision 2/3.
+    assert citation_precision_recall(ids("article:5", "article:5", "article:9"), ids("article:5")) == (0.5, 1.0)
+
+
+def test_an_in_scope_question_must_expect_something():
+    with pytest.raises(ValueError, match="at least one section"):
+        citation_precision_recall(ids("article:5"), [])
+
+
+def test_the_mean_citation_scores_are_over_all_questions_including_zeros():
+    # Precision (1 + 0.5 + 0) / 3 = 0.5; recall (1 + 0 + 0) / 3 = 1/3.
+    scores = score_citations([(1.0, 1.0), (0.5, 0.0), (0.0, 0.0)])
+    assert isinstance(scores, CitationScores) and scores.questions == 3
+    assert scores.precision == pytest.approx(0.5) and scores.recall == pytest.approx(1 / 3)
+
+
+def test_citation_scores_of_zero_questions_are_undefined_not_zero():
+    with pytest.raises(ValueError, match="zero questions"):
+        score_citations([])
+
+
+@pytest.mark.parametrize("pair", [(1.1, 0.5), (0.5, -0.1), (float("nan"), 0.5), (0.5, float("inf"))])
+def test_citation_scores_outside_zero_to_one_are_refused(pair):
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        score_citations([(1.0, 1.0), pair])
+
+
+def test_refusal_accuracy_is_the_share_refused():
+    scores = score_refusals([True, False, True, True])
+    assert scores == RefusalScores(questions=4, refused=3)
+    assert scores.accuracy == pytest.approx(0.75)
+
+
+def test_refusal_accuracy_extremes():
+    assert score_refusals([False, False]).accuracy == 0.0
+    assert score_refusals([True]).accuracy == 1.0
+
+
+def test_refusal_accuracy_of_zero_questions_is_undefined_not_zero():
+    with pytest.raises(ValueError, match="zero questions"):
+        score_refusals([])
+
+
+def test_generation_scores_are_immutable():
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        score_refusals([True]).refused = 0  # type: ignore[misc]
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        score_citations([(1.0, 1.0)]).precision = 0.0  # type: ignore[misc]
