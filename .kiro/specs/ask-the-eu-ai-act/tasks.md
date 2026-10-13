@@ -169,7 +169,7 @@ Checkboxes are ticked only after you approve the task.
 
 ## D. Generation evaluation
 
-- [ ] **Task 19 — Eval: generation metrics, cache, call cap**
+- [x] **Task 19 — Eval: generation metrics, cache, call cap**
   - *Goal:* refusal accuracy and citation precision/recall, bounded in cost.
   - *Files:* `backend/askact/evaluation/cache.py`, extensions to `metrics.py` and `run.py`, tests; add `eval/.cache/` to `.gitignore`.
   - *Behaviour:* run the real `answer()` pipeline per config; refusal accuracy over `out_of_scope` (refused = gate fires, or `covered=false`, or all citations dropped); citation precision and recall over in-scope entries (no citations → 0 for both); cache keyed by `sha256(provider, model, system, user, max_output_tokens)` in JSON lines; `EVAL_MAX_LLM_CALLS` counts only uncached calls and aborts before exceeding it, printing no generation metrics from an incomplete run; both splits reported; table extended and written to `eval/results.md`.
@@ -181,6 +181,8 @@ Checkboxes are ticked only after you approve the task.
   - *Goal:* set the two relevance thresholds honestly and produce the final numbers.
   - *Process:* using the score ranges printed by the eval, choose `RELEVANCE_THRESHOLD_COSINE` and `RELEVANCE_THRESHOLD_RERANK` from **`dev` results only**; record the chosen values and the dev evidence; set them as the documented values in `.env.example`/`config.py`; then run the `test` split **once** as the final result and write `eval/results.md`. Before any paid run I tell you the maximum number of calls and an estimated cost for your approval.
   - *Tests:* none new in code; the verification is the real run output, which I show you unedited. If the dev set is too small to separate in-scope from out-of-scope scores, I report that rather than force a threshold.
+  - *Status, part 1 (done, free; this PR):* thresholds chosen from dev only and set as the defaults in `config.py` and `.env.example`: `RELEVANCE_THRESHOLD_COSINE=0.69`, `RELEVANCE_THRESHOLD_RERANK=2.5`. The rule, the dev evidence and the caveats (overlapping scores, 6 out_of_scope questions, tuned for the default models only) are in design §3.3, "Threshold tuning (Task 20)". The real-model dev retrieval numbers were re-run after Task 19 and match the earlier checkpoint.
+  - *Status, part 2 (needs the owner's key; not done):* the paid runs. The agent never sees the key, so the owner runs them locally from the repository root with `LLM_PROVIDER`, `LLM_MODEL` and `LLM_API_KEY` in `.env`: (1) the live smoke test; (2) `EVAL_MAX_LLM_CALLS=90 python -m askact.evaluation.run --split dev` (at most 81 calls); (3) after reviewing that output, once, `EVAL_MAX_LLM_CALLS=90 python -m askact.evaluation.run --split both` (dev from the cache, at most 84 new calls), which writes the final `eval/results.md`. Worst-case size of both runs: 165 calls, 594k input and 82.5k output tokens; the cost is that times the model's prices. Then `eval/results.md` is committed and the task is ticked.
   - *Covers:* R3.8 (tuned thresholds), R5.10, R5.11 (final), R5.12.
 
 ---

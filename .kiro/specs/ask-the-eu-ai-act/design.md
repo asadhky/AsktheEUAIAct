@@ -211,6 +211,14 @@ A missing or invalid key/provider/model becomes a clear `llm_unavailable` error 
 
 **Verifying the adapters.** Request and response shapes are not written from memory: when the OpenAI adapter is implemented, the task reads OpenAI's current API documentation first (endpoint, auth header, version header if any, the output-token parameter name, and where token usage is reported) and records the doc URL and the date it was read in a comment at the top of the adapter. The adapter also gets one live smoke test, marked `slow` and manual: it makes a single tiny real call (a trivial prompt, a very small output-token limit) and asserts a non-empty reply and that token usage is reported. It reads its key from the environment and is skipped when the key is absent, so it never runs in CI and never needs a secret there. The smoke test calls the adapter directly, so it does not pass through the spend ledger; its cost is a handful of tokens per run.
 
+**Threshold tuning (Task 20).** Both thresholds were chosen from the `dev` split only (R5.10), by a stated rule, applied to the per-question relevance of the top chunk with the real models (`bge-small-en-v1.5`, `ms-marco-MiniLM-L-6-v2`, `k=5`, index build hash `6a5aac7af9cc03a7`, 495 chunks, date 2026-10-13). The test split was not run, scored or inspected for this.
+- **The rule.** Candidates are the midpoints between consecutive dev scores. Allow a candidate if it refuses at most 2 of the in-scope questions whose expected section was retrieved. Among those, take the one that refuses the most `out_of_scope` questions; if several tie, take the centre of that plateau.
+- **Dev evidence (29 questions: 23 in-scope, 6 out_of_scope; hybrid retrieves the expected section for 18 of the 23 in-scope).** The scores overlap, so no threshold separates the two kinds. The best any threshold does is refuse 5 of the 6 `out_of_scope` questions; the sixth (q048) scores 0.737 under `hybrid` and 3.193 under `hybrid+rerank`, above many correct in-scope questions, so it is left for the LLM to decline.
+- **`RELEVANCE_THRESHOLD_COSINE = 0.69`**, tuned on `hybrid`, the app's default config. Plateau of candidates 0.676 to 0.703, centre 0.689. On dev it refuses 5 of 6 `out_of_scope` and loses 1 of 18 retrievable in-scope questions (q017, whose top chunk scores 0.611); it also refuses 1 of the 5 in-scope questions that retrieval missed anyway. Margins: it would start refusing one more `out_of_scope` question below 0.662 (q050) and one more retrievable in-scope question above 0.703 (q036), so the safe zone is 0.041 wide and 0.69 is nearer the upper edge. The same value on `dense` refuses 4 of 6 and loses 1 of 18; on `bm25` it refuses 6 of 6 but loses 4 of 18. The value is shared by the three configs (R3.8) and fits `bm25` and `dense` worse; the app uses neither.
+- **`RELEVANCE_THRESHOLD_RERANK = 2.5`**, tuned on `hybrid+rerank`. Plateau 2.348 to 2.618, centre 2.483. On dev it refuses 5 of 6 `out_of_scope` and loses 2 of 18 retrievable in-scope questions (q017 and q036), the most the rule allows; it also refuses 2 of the 5 that retrieval missed. The zone in which that outcome is unchanged is 2.218 (q046) to 2.759 (q022), so 2.5 is near its middle.
+- **What this does not show.** Six `out_of_scope` questions and 23 in-scope ones are a small sample, and the plateau comes from the position of a handful of questions: expect the thresholds to move with a different question set. They are tuned for these two models and this chunking; `.env.example` and `config.py` say so, and `Settings` still accepts `None` (the gate then fails closed).
+- **Why a rule, and what it does not prove.** With overlapping scores any threshold is a trade, so the choice is written as a rule that can be re-run instead of a number picked by eye. Honestly stated: the rule was written after looking at the sorted per-question dev scores (to see that they overlap), so the allowance of 2 lost in-scope questions is a judgement made with that table in view, not a pre-registered setting. What does hold is that no `test` score was run or inspected, and that the dev totals above are enough to re-derive the values.
+
 ### 3.4 API and safety guards (R6)
 
 **Endpoints:** `POST /ask {question}` and `GET /health`.
@@ -234,7 +242,7 @@ Errors use `{"error": {"code": "...", "message": "..."}}`:
 | `llm_unavailable` | 503 | provider, model, or key missing/invalid |
 | `llm_bad_output` | 502 | reply is not the required structure |
 | `index_unavailable` | 503 | index missing or stale |
-| `not_configured` | 503 | the relevance threshold for the active retrieval config is unset or not a finite number (answering is unusable until Task 20 tunes it) |
+| `not_configured` | 503 | the relevance threshold for the active retrieval config is unset or not a finite number (the defaults are tuned, see "Threshold tuning (Task 20)"; this happens only for a `Settings` built in code without one) |
 
 **Order of checks in `/ask`:** body size → rate limit → body shape → length → retrieve → relevance gate → spend reservation → LLM → validate → reconcile. Everything cheap and free runs before anything that costs money. (The first draft said "length → rate limit"; that cannot be built as written, see "As built (Task 18)".)
 
@@ -401,8 +409,8 @@ volumes: { state: {} }
 | `EMBEDDER` / `RERANKER` | `real` | `stub` for tests/CI |
 | `RERANKER_ENABLED` | `false` | app uses `hybrid+rerank` when true |
 | `TOP_K` | 5 | chunks passed to the LLM |
-| `RELEVANCE_THRESHOLD_COSINE` | placeholder until dev tuning | gate for bm25/dense/hybrid |
-| `RELEVANCE_THRESHOLD_RERANK` | placeholder until dev tuning | gate for hybrid+rerank |
+| `RELEVANCE_THRESHOLD_COSINE` | 0.69 (tuned on dev, Task 20) | gate for bm25/dense/hybrid |
+| `RELEVANCE_THRESHOLD_RERANK` | 2.5 (tuned on dev, Task 20) | gate for hybrid+rerank |
 | `LLM_PROVIDER` | none (required) | `openai` \| `fake` |
 | `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL` | none | provider settings (base URL optional) |
 | `LLM_PRICE_TABLE` | none (required for paid use) | per-model prices (JSON) |
@@ -417,7 +425,7 @@ volumes: { state: {} }
 | `LOG_QUESTIONS` | `false` | when `true`, add the question text to the request log line; local debugging only |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | **build-time** UI build arg; must be the public backend URL for a deployment, and changing it needs a UI rebuild (§3.5) |
 
-The numeric defaults (500 tokens, 500 characters, 10/min, $1.00, 250 calls, and the 1800-character chunk size until its token-length test has passed) are starting points. The two relevance thresholds have no honest default: they are set from dev-split results in a dedicated task, and the README states the tuned values.
+The numeric defaults (500 tokens, 500 characters, 10/min, $1.00, 250 calls, and the 1800-character chunk size until its token-length test has passed) are starting points. The two relevance thresholds are different: their defaults were tuned on the dev split in Task 20 (see "Threshold tuning" in 3.3), are valid only for the default models, and the README states them.
 
 ---
 

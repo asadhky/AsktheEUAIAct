@@ -98,15 +98,23 @@ def test_any_finite_threshold_is_accepted_including_zero_and_negatives(monkeypat
     assert load(monkeypatch, RELEVANCE_THRESHOLD_COSINE=value).relevance_threshold_cosine == expected
 
 
-def test_relevance_thresholds_are_none_until_tuned(monkeypatch):
+def test_relevance_thresholds_default_to_the_values_tuned_on_dev(monkeypatch):
+    # Pinned on purpose: these were chosen from dev-split evidence for the default models (design.md 3.3, Task 20).
+    # Changing one is a decision that needs new evidence, not a quiet edit.
     s = load(monkeypatch)
-    assert s.relevance_threshold_cosine is None
-    assert s.relevance_threshold_rerank is None
+    assert s.relevance_threshold_cosine == 0.69
+    assert s.relevance_threshold_rerank == 2.5
+
+
+def test_a_settings_built_in_code_without_a_threshold_is_still_allowed(monkeypatch):
+    s = Settings(_env_file=None, relevance_threshold_cosine=None, relevance_threshold_rerank=None)
+    assert s.relevance_threshold_cosine is None and s.relevance_threshold_rerank is None
 
 
 def test_blank_value_counts_as_unset(monkeypatch):
+    # "Unset" means the built-in default applies, or there is none (an optional setting).
     s = load(monkeypatch, RELEVANCE_THRESHOLD_COSINE="", LLM_PROVIDER="", TOP_K="")
-    assert s.relevance_threshold_cosine is None
+    assert s.relevance_threshold_cosine == 0.69
     assert s.llm_provider is None
     assert s.top_k == 5
 

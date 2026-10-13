@@ -1083,13 +1083,13 @@ def test_both_splits_share_one_call_budget_and_one_cache(project, capsys):
     assert made + cached == 28  # (5 dev + 2 test) questions x four configs
 
 
-def test_python_dash_m_without_the_flag_asks_for_the_thresholds_before_doing_anything(tmp_path):
+def test_python_dash_m_without_the_flag_asks_for_a_provider_before_doing_anything(tmp_path):
     project = Project(tmp_path)
     env = {k: v for k, v in os.environ.items() if not k.startswith(("RELEVANCE_", "LLM_", "EVAL_"))}
     result = subprocess.run([sys.executable, "-m", "askact.evaluation.run", "--k", "3"], cwd=tmp_path,
                             env={**env, "EMBEDDER": "stub", "RERANKER": "stub"}, capture_output=True, text=True)
     assert result.returncode == 1 and result.stdout == ""
-    assert "RELEVANCE_THRESHOLD_COSINE is not set" in result.stderr
+    assert "LLM_PROVIDER is not set" in result.stderr  # the thresholds have tuned defaults now; the provider has none
     assert not project.results.exists() and not project.cache.exists()
 
 
