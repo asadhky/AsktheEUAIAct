@@ -24,10 +24,11 @@ Error responses never echo the request or the text of an exception.
 """
 
 import logging
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, TextIO
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -226,9 +227,32 @@ class _DeferredLLM:
         return self._llm.complete(system, user, max_output_tokens)
 
 
+def configure_logging(stream: TextIO | None = None) -> None:
+    """Send this app's log lines to stderr, so that a container's log shows them.
+
+    Without this the per-request line (`request_log`, logged at INFO) is dropped: Python's default handler prints
+    WARNING and above only, and uvicorn configures its own loggers, not ours. The format is the bare message, as the
+    request line is already a complete JSON object. Only the `askact` loggers are touched, so the libraries (httpx and
+    huggingface_hub log every request at INFO) stay quiet.
+
+    Safe to call again: it replaces the handler it installed before instead of adding a second, which would print
+    every line twice. Called by `build_app` and never by `create_app`, because it changes global logger state, which
+    would leak from one test into the next.
+    """
+    logger = logging.getLogger("askact")
+    for handler in [h for h in logger.handlers if getattr(h, "_askact_stderr", False)]:
+        logger.removeHandler(handler)
+    handler = logging.StreamHandler(stream or sys.stderr)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    handler._askact_stderr = True  # type: ignore[attr-defined]  # marks it as ours, for the replacement above
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+
 def build_app() -> FastAPI:
     """The production entry point: `uvicorn --factory askact.api:build_app --no-access-log`. Reads settings from
     the environment, builds the real services, returns the app. Importing this module loads nothing."""
+    configure_logging()
     settings = Settings()
     return create_app(settings, build_services(settings))
 
