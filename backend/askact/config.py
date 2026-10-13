@@ -54,11 +54,16 @@ class Settings(BaseSettings):
     top_k: int = Field(5, gt=0)
 
     # --- Generation ---
-    # No honest default exists: they are tuned on the dev split. Until then the gate is unusable.
+    # Tuned on the dev split only (Task 20; the evidence and the rule are in design.md section 3.3). A threshold only
+    # means something for the models it was tuned with: these are for EMBEDDING_MODEL=BAAI/bge-small-en-v1.5 and
+    # RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2, and must be tuned again if either changes. The cosine
+    # value was tuned on `hybrid` (the app's default config); `bm25` and `dense` share it (R3.8) but it fits them worse.
     # allow_inf_nan=False: `relevance < nan` is always False, so a NaN threshold would silently let every
     # question through to the (paid) LLM. A rerank score can be negative, so any finite number is allowed.
-    relevance_threshold_cosine: float | None = Field(None, allow_inf_nan=False)  # bm25, dense, hybrid
-    relevance_threshold_rerank: float | None = Field(None, allow_inf_nan=False)  # hybrid+rerank
+    # The type still allows None: a Settings built in code without a threshold fails closed (`not_configured`). The
+    # environment cannot produce it, since a blank value means "the built-in default".
+    relevance_threshold_cosine: float | None = Field(0.69, allow_inf_nan=False)  # bm25, dense, hybrid
+    relevance_threshold_rerank: float | None = Field(2.5, allow_inf_nan=False)  # hybrid+rerank
     # Validated where it is used (the provider factory), so an unsupported value gets a
     # clear "LLM unavailable" error instead of failing every import of the settings.
     llm_provider: str | None = None
