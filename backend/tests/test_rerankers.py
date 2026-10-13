@@ -159,6 +159,21 @@ class FakeCrossEncoder:
         return [float(len(passage)) - 10.0 for _, passage in pairs]  # arbitrary, signed, like logits
 
 
+def test_the_reranker_does_not_force_a_device(monkeypatch):
+    # Forcing device="cpu" gave NaN scores on Apple Silicon (reported by the owner), so the choice is left to
+    # sentence-transformers. Re-adding it needs a reason that holds on that hardware.
+    seen = {}
+
+    class Recording(FakeCrossEncoder):
+        def __init__(self, *args, **kwargs):
+            seen["args"], seen["kwargs"] = args, kwargs
+            super().__init__(*args, **kwargs)
+
+    install_fake_sentence_transformers(monkeypatch, Recording)
+    CrossEncoderReranker("cross-encoder/ms-marco-MiniLM-L-6-v2")
+    assert seen == {"args": ("cross-encoder/ms-marco-MiniLM-L-6-v2",), "kwargs": {}}
+
+
 @pytest.fixture
 def wrapped(monkeypatch):
     install_fake_sentence_transformers(monkeypatch, FakeCrossEncoder)
