@@ -22,6 +22,10 @@ dependencies = [
     "rank-bm25>=0.2.2",
     # Reads eval/questions.yaml. 6.0.1 is the first release with Python 3.12 support.
     "pyyaml>=6.0.1",
+    # The HTTP API (Task 18). Tested with FastAPI 0.143.0 on Starlette 1.7.0; older versions are untested.
+    "fastapi>=0.143",
+    # The server that runs it: `uvicorn --factory askact.api:build_app --no-access-log` (Task 22). Tested with 0.54.0.
+    "uvicorn>=0.54",
     # 2.7 is the oldest release that has `NoDecode` (tested: 2.6.1 fails to import it, 2.7.0 passes).
     "pydantic-settings>=2.7",
 ]
@@ -29,6 +33,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8",
+    # Starlette's TestClient needs an HTTP library; it prefers httpx2 and falls back to httpx with a deprecation warning.
+    "httpx2>=2.13",
 ]
 # Real local embedding/reranker models (pulls torch). Not needed for tests or CI, which use stubs.
 models = [
