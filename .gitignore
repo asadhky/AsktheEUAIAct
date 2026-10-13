@@ -14,6 +14,8 @@ __pycache__/
 node_modules/
 .next/
 dist/
+*.tsbuildinfo
+next-env.d.ts
 
 # Generated data (rebuild with the ingestion script)
 data/raw/
