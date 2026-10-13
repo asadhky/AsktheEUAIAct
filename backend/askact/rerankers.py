@@ -73,7 +73,7 @@ class CrossEncoderReranker:
             ) from exc
         try:
             # CPU on purpose: the model is small and only about twenty passages are scored per question.
-            self._model: Any = CrossEncoder(model_name, device="cpu")
+            self._model: Any = CrossEncoder(model_name)
         except Exception as exc:  # network failure, unknown model name, corrupt cache, ...
             raise RerankerError(
                 f"could not load the reranker model {model_name!r} ({type(exc).__name__}: {exc}). "
