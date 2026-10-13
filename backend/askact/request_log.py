@@ -32,6 +32,8 @@ from askact.retrieval import CONFIGS
 # design 3.4. Keep this list in step with it. A closed set, so that a caller cannot pass free text as the outcome.
 SUCCESS_OUTCOMES = frozenset({"answered", "not_covered"})
 ERROR_OUTCOMES = frozenset({
+    "request_too_large",  # the body was over the size cap, so it was refused before it was parsed
+    "invalid_request",  # the body was not a JSON object with a text `question`
     "question_too_long",
     "rate_limited",
     "spend_cap_reached",

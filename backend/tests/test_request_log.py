@@ -155,8 +155,8 @@ def test_the_line_is_compact_json_with_no_spaces_after_separators():
 
 def test_the_outcomes_are_the_two_successes_and_the_api_error_codes():
     assert SUCCESS_OUTCOMES == {"answered", "not_covered"}
-    assert ERROR_OUTCOMES == {"question_too_long", "rate_limited", "spend_cap_reached", "llm_unavailable", "llm_bad_output",
-                              "index_unavailable", "not_configured", "internal_error"}
+    assert ERROR_OUTCOMES == {"request_too_large", "invalid_request", "question_too_long", "rate_limited", "spend_cap_reached",
+                              "llm_unavailable", "llm_bad_output", "index_unavailable", "not_configured", "internal_error"}
     assert OUTCOMES == SUCCESS_OUTCOMES | ERROR_OUTCOMES and not (SUCCESS_OUTCOMES & ERROR_OUTCOMES)
 
 
@@ -612,7 +612,8 @@ def test_the_only_loggers_on_the_request_path_are_the_ones_we_know_about():
         for _, callee, _ in calls_in(path):
             if callee.split(".")[0] in {"log", "logger"} and callee.split(".")[-1] in {"debug", "info", "warning", "error", "critical"}:
                 found.add(path.relative_to(root).as_posix())
-    assert found == {"embedders.py", "generation/answer.py", "guards/spend.py", "request_log.py"}
+    # api.py logs once at startup that the index is unusable: the exception's kind and a fixed sentence, no path.
+    assert found == {"api.py", "embedders.py", "generation/answer.py", "guards/spend.py", "request_log.py"}
 
 
 def test_every_log_call_on_the_request_path_passes_its_values_as_arguments_never_inside_the_template():
