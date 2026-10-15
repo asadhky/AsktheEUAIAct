@@ -1,0 +1,55 @@
+# `docker compose up --build` starts the whole app: the backend on http://localhost:8000 and the chat page on
+# http://localhost:3000. First copy .env.example to .env and set LLM_PROVIDER, LLM_MODEL and LLM_API_KEY (and a price
+# for the model in LLM_PRICE_TABLE): without them the page loads but every question is answered "not available".
+#
+# The first build downloads the Act's text, the two models and PyTorch (CPU), and takes several minutes.
+
+services:
+  backend:
+    build:
+      # The repository root, so that the Dockerfile can reach backend/ and the optional data/raw/. The .dockerignore
+      # there is an allowlist: .env and everything else is left out of the build.
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        # What the index and the downloaded models are built from. Compose reads these from .env.
+        EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+        RERANKER_MODEL: ${RERANKER_MODEL:-cross-encoder/ms-marco-MiniLM-L-6-v2}
+        CHUNK_MAX_CHARS: ${CHUNK_MAX_CHARS:-1800}
+    # The settings of the running app. Not required, so that `config` and `build` work before .env exists.
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      # Published on this machine only (127.0.0.1): the browser on this machine calls the backend directly. Remove the
+      # address to expose it on the network, and read "Reaching the backend" in the README first: behind a proxy the
+      # rate limit needs TRUSTED_PROXY_HEADER, and in front of nothing it must stay unset.
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # SPEND_DB_PATH (/var/lib/askact/spend.sqlite3 by default) lives here, so the daily cap survives re-creating the
+      # container. A local named volume, not a network filesystem: SQLite needs working file locks.
+      - state:/var/lib/askact
+    healthcheck:
+      # Healthy only when the index is loaded (/health is 503 otherwise). Python, since the image has no curl.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: ./frontend
+      args:
+        # BUILD-TIME: see frontend/Dockerfile. Change it and rebuild (`docker compose up --build`).
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  state:

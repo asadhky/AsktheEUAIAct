@@ -4,14 +4,19 @@ The other API tests use a stand-in for `Retriever.search`, which is what let a b
 run the real thing, so the seams between the API, the retriever, the answer pipeline and the ledger are exercised.
 """
 
+import io
 import json
+import logging
+import os
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from askact.api import IndexState, Services, build_app, build_services, create_app
+from askact.api import IndexState, Services, build_app, build_services, configure_logging, create_app
 from askact.config import ModelPrice, Settings
 from askact.generation.llm import FakeLLM, LLMReply
 from askact.guards.ratelimit import RateLimiter
@@ -20,6 +25,7 @@ from askact.index import INDEX_DIR
 from askact.ingest.build import build_index
 from askact.ingest.fetch import CACHE_FILENAME
 from askact.ingest.parse import Counts
+from askact.request_log import log_request
 from askact.retrieval import Retriever
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "mini_act.html"
@@ -259,3 +265,74 @@ def test_build_app_reads_settings_from_the_environment(project, monkeypatch):
     client = TestClient(build_app())
     assert client.get("/health", headers={"Origin": "https://app.example.org"}).headers["access-control-allow-origin"] == "https://app.example.org"
     assert INDEX_DIR == Path("data/index")
+
+
+# --- logging in the running process ---------------------------------------------------------------------------
+
+def test_configure_logging_makes_the_request_line_appear_on_the_stream():
+    # Found while writing the Dockerfile: the request line is logged at INFO, Python's default handler prints
+    # WARNING and above, and nothing else installs a handler under uvicorn, so a container showed no request lines.
+    stream = io.StringIO()
+    configure_logging(stream)
+    log_request(outcome="answered", config="hybrid", latency_ms=12.3, input_tokens=5, output_tokens=7)
+    [line] = stream.getvalue().splitlines()
+    record = json.loads(line)  # the bare message: no logger name, level or timestamp prefix in front of the JSON
+    assert record["event"] == "ask" and record["outcome"] == "answered" and record["input_tokens"] == 5
+
+
+def test_configure_logging_also_shows_the_startup_error_and_nothing_from_other_libraries():
+    stream = io.StringIO()
+    configure_logging(stream)
+    logging.getLogger("askact.api").error("the search index is missing")
+    logging.getLogger("httpx").info("HTTP Request: POST https://example.invalid 200 OK")
+    logging.getLogger("huggingface_hub").info("Downloading model")
+    assert stream.getvalue() == "the search index is missing\n"
+
+
+def test_calling_configure_logging_again_replaces_its_handler_so_lines_are_not_doubled():
+    first, second = io.StringIO(), io.StringIO()
+    configure_logging(first)
+    configure_logging(second)
+    log_request(outcome="answered", config="hybrid", latency_ms=1.0)
+    assert first.getvalue() == "" and len(second.getvalue().splitlines()) == 1
+
+
+def test_configure_logging_leaves_handlers_that_are_not_its_own(caplog):
+    # pytest's caplog handler is on the root logger and must keep working: propagation stays on.
+    configure_logging(io.StringIO())
+    with caplog.at_level(logging.INFO, logger="askact.request"):
+        log_request(outcome="answered", config="hybrid", latency_ms=1.0)
+    assert len(caplog.records) == 1
+
+
+def test_build_app_installs_the_logging(project, monkeypatch):
+    tmp_path, _ = project
+    monkeypatch.chdir(tmp_path)
+    for name, value in {"EMBEDDER": "stub", "RERANKER": "stub", "LLM_PROVIDER": "fake", "SPEND_DB_PATH": str(tmp_path / "s.sqlite3")}.items():
+        monkeypatch.setenv(name, value)
+    before = [h for h in logging.getLogger("askact").handlers if getattr(h, "_askact_stderr", False)]
+    build_app()
+    after = [h for h in logging.getLogger("askact").handlers if getattr(h, "_askact_stderr", False)]
+    assert before == [] and len(after) == 1
+
+
+def test_create_app_does_not_touch_logging(project):
+    # Tests build the app through create_app; if it changed global logger state they would leak into each other.
+    tmp_path, settings = project
+    before = list(logging.getLogger("askact").handlers)
+    create_app(settings, Services(index=IndexState(None), llm=FakeLLM(), spend=SpendLedger.from_settings(settings), limiter=RateLimiter(10)))
+    assert list(logging.getLogger("askact").handlers) == before
+
+
+def test_in_a_real_process_the_request_line_reaches_stderr_only_after_configure_logging():
+    code = (
+        "import sys; from askact.request_log import log_request\n"
+        "from askact.api import configure_logging\n"
+        "if sys.argv[1] == 'configured': configure_logging()\n"
+        "log_request(outcome='answered', config='hybrid', latency_ms=1.0)\n"
+    )
+    env = {**os.environ, "EMBEDDER": "stub", "RERANKER": "stub"}
+    plain = subprocess.run([sys.executable, "-c", code, "plain"], env=env, capture_output=True, text=True)
+    configured = subprocess.run([sys.executable, "-c", code, "configured"], env=env, capture_output=True, text=True)
+    assert plain.returncode == 0 and plain.stderr == "" and plain.stdout == ""  # the bug this fixes, kept visible
+    assert json.loads(configured.stderr)["outcome"] == "answered" and configured.stdout == ""
