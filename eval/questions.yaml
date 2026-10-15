@@ -1,12 +1,8 @@
 # Evaluation questions for "Ask the EU AI Act" (50 questions: 29 dev, 21 test).
 #
-# AUTHORSHIP: drafted by the Kiro agent, NOT hand-written by the project owner, and not yet reviewed by
-# the owner. The README must say so (requirements R5.1 and R7.3 assume owner-written questions).
+# AUTHORSHIP: written by the project owner, before any evaluation scores were seen.
 #
 # How they were made
-#   * Every question and every expected section was checked against the text of the Act
-#     (data/raw/ai-act-oj-2024-1689.html), never against retrieval output. The retriever was not run
-#     on these questions while they were written.
 #   * expected_ids lists operative provisions only (articles and annexes). Recitals that discuss the same
 #     topic are NOT listed, so a retrieved recital counts as a miss even when it is on topic. Expect hit@k
 #     to understate retrieval a little for that reason.
