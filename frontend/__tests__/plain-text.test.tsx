@@ -18,7 +18,7 @@ async function askOnce(response: Response, question = "a question") {
   const user = userEvent.setup();
   const view = render(<Page />);
   await user.type(screen.getByLabelText("Your question"), question);
-  await user.click(screen.getByRole("button"));
+  await user.click(screen.getByRole("button", { name: /^Ask/ }));
   return view;
 }
 
