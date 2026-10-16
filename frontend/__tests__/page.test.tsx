@@ -317,7 +317,7 @@ describe("the example questions", () => {
     "Which AI practices are prohibited?",
     "What obligations apply to providers of general-purpose AI models?",
     "What does the AI Act say about human oversight of high-risk AI systems?",
-    "What is the maximum fine for breaking the prohibited-practice rules?",
+    "What penalties apply when an operator breaks the AI Act?",
   ];
   const examples = () => within(screen.getByRole("list", { name: "Example questions" })).getAllByRole("button");
 
