@@ -1,58 +1,248 @@
 :root {
-  --text: #1c1c1e;
-  --muted: #5f6368;
-  --line: #d9dce1;
+  color-scheme: light dark;
+  --text: #161616;
+  --muted: #5c5b57;
+  --bg: #fbfbf9;
+  --surface: #fff;
+  --question-bg: #f0efea;
+  --hairline: #e3e1dc;
+  /* Strong enough to see as a control edge (3:1 on --bg), quiet enough to read as one line. */
+  --field-line: #8e8b84;
+  --button: #161616;
+  --button-text: #fff;
+  --button-hover: #33322f;
+  --disabled-bg: #e6e4df;
+  --disabled-text: #6f6d68;
+  /* Card and divider edges, in the same warm neutral as the page. */
+  --line: #dcd9d2;
   --accent: #1a4fa0;
-  --notice-bg: #fff6dd;
-  --notice-line: #e0c36a;
+  --selection: #c8d7f1;
+  --notice-line: #b9b6ae;
   --error: #a4262c;
   --not-covered: #5a4a8a;
+  --limit: #7a5200;
+  --error-bg: #fbf1f0;
+  --error-line: #e3b6b2;
+  --shadow: 28 28 30;
+  /* The Act's own text is set like a printed page (warm paper, serif, ruled passages) so it reads as the document
+     itself, apart from the interface around it. Installed serifs only: the page loads no web fonts. */
+  --paper: #fffdf8;
+  --paper-clear: rgb(255 253 248 / 0);
+  --ink: #26241f;
+  --rule: #e6e0d3;
+  --mark: #e7eefa;
+  --mark-arrive: #c8d7f1;
+  --display: ui-serif, "Iowan Old Style", Charter, Georgia, serif;
+  --serif: "Iowan Old Style", Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+  /* Spacing scale, 4px base. */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+  --s-8: 4.5rem;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--text);
 }
 
+/* The same roles at night: light text on a warm near-black, the paper a shade above the page, the accent lifted so
+   links and focus rings keep their contrast. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #ecebe8;
+    --muted: #a9a7a1;
+    --bg: #141413;
+    --surface: #1c1c1a;
+    --question-bg: #242321;
+    --hairline: #2e2d2a;
+    --field-line: #77746e;
+    --button: #ecebe8;
+    --button-text: #141413;
+    --button-hover: #d2d0cb;
+    --disabled-bg: #262523;
+    --disabled-text: #8d8b85;
+    --line: #363531;
+    --accent: #8fb0ec;
+    --selection: #2f4370;
+    --notice-line: #55534e;
+    --error: #f0a29d;
+    --not-covered: #b9aae8;
+    --limit: #e0b45c;
+    --error-bg: #2a1a19;
+    --error-line: #5c3431;
+    --shadow: 0 0 0;
+    --paper: #1b1a18;
+    --paper-clear: rgb(27 26 24 / 0);
+    --ink: #e4e1d9;
+    --rule: #34312b;
+    --mark: #22304a;
+    --mark-arrive: #2f4370;
+  }
+}
+
 * { box-sizing: border-box; }
-body { margin: 0; background: #fafbfc; line-height: 1.5; }
-main { max-width: 72rem; margin: 0 auto; padding: 1rem; }
-h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+body { margin: 0; background: var(--bg); line-height: 1.5; }
+main { max-width: 76rem; margin: 0 auto; padding: var(--s-6) var(--s-4); }
+h1 { margin: 0 0 var(--s-2); font-family: var(--display); font-size: 1.75rem; font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; text-wrap: balance; }
 h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
 h3 { margin: 0 0 0.25rem; font-size: 1rem; }
+::selection { background: var(--selection); color: var(--text); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
+a:hover { text-decoration-thickness: 2px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:disabled { cursor: not-allowed; }
 
-.notices { background: var(--notice-bg); border: 1px solid var(--notice-line); border-radius: 6px; padding: 0.5rem 0.75rem; }
-.notices p { margin: 0.15rem 0; font-size: 0.9rem; }
+.title-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--s-2) var(--s-4); }
+/* A quiet text button: going back is always available but never competes with asking. */
+.back { display: inline-flex; align-items: center; gap: var(--s-2); min-height: 2.75rem; padding: 0 var(--s-1); color: var(--muted); background: none; border: 0; font-size: 0.9375rem; }
+.back:hover { color: var(--text); }
+.back svg { flex: none; transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.back:hover svg { transform: translateX(-2px); }
 
-/* The sources sit beside the conversation on a wide screen and below it on a narrow one. */
-.layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1.5rem; margin-top: 1rem; align-items: start; }
-@media (max-width: 52rem) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.intro { margin: 0 0 var(--s-4); max-width: 60ch; color: var(--muted); font-size: 1.0625rem; text-wrap: pretty; }
 
-.turn { margin-bottom: 1rem; }
-.question, .reply { margin: 0.25rem 0; padding: 0.5rem 0.75rem; border-radius: 6px; display: block; }
-.question { background: #eef2f8; }
-.reply { background: #fff; border: 1px solid var(--line); }
-.reply.not-covered { border-color: var(--not-covered); border-left-width: 5px; }
-.reply.error { border-color: var(--error); border-left-width: 5px; }
-.who { display: block; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+/* Always visible, in every state, but as a quiet aside: small muted text behind a hairline rule. */
+.notices { padding-left: var(--s-3); border-left: 1px solid var(--notice-line); color: var(--muted); font-size: 0.875rem; line-height: 1.45; }
+.notices p { margin: 0; max-width: 72ch; }
+.notices p + p { margin-top: var(--s-1); }
+
+/* The sources sit beside the conversation, the question box and the footer on a wide screen. The conversation column is a little
+   wider: the answer leads, the passages support it. The second row takes any extra height the panel brings, so the
+   question box stays right under the conversation. */
+.layout {
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 4fr); grid-template-rows: auto 1fr auto;
+  grid-template-areas: "conversation sources" "composer sources" "about sources"; column-gap: var(--s-6); margin-top: var(--s-5); padding-bottom: var(--s-4); align-items: start;
+}
+.conversation { grid-area: conversation; }
+.composer { grid-area: composer; }
+.sources { grid-area: sources; }
+.about { grid-area: about; }
+
+/* Turns are separated generously; inside a turn the question and its reply sit close. */
+.turn { margin-bottom: var(--s-5); }
+.question, .reply { margin: var(--s-2) 0 0; padding: var(--s-2) var(--s-3); border-radius: 6px; display: block; }
+.question { margin-top: 0; background: var(--question-bg); }
+.reply { background: var(--surface); border: 1px solid var(--line); }
+.reply.answered { padding: var(--s-4) var(--s-5); font-size: 1.0625rem; line-height: 1.6; box-shadow: 0 1px 2px rgb(var(--shadow) / 0.05), 0 8px 24px -16px rgb(var(--shadow) / 0.25); }
+/* Three kinds of "no answer". Not covered and the demo's limits are refusals by design: no fill, a hairline, a
+   coloured label. A fault is the only one on a tinted ground. The label text names each, so colour is never the only
+   signal. */
+.reply.not-covered, .reply.limit { background: transparent; border-color: var(--line); }
+.reply.error { background: var(--error-bg); border-color: var(--error-line); }
+.hint { display: block; margin-top: var(--s-1); color: var(--muted); font-size: 0.875rem; }
+/* Who said it, in the same quiet label style as "Your question" and "Example questions". */
+.who { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--muted); }
+/* A colon only a screen reader hears, so "Error" and its message are not read as one word. It is generated content,
+   not text, so the label's text stays exactly "Error". */
+.who::after { content: ": "; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.answered .who { margin-bottom: var(--s-1); }
 .not-covered .who { color: var(--not-covered); }
+.limit .who { color: var(--limit); }
 .error .who { color: var(--error); }
 
 /* pre-wrap keeps the line breaks of an answer or a passage; the text is still plain text, never markup. */
 .text { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
 
-form { margin-top: 1rem; }
-label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
-.row { display: flex; gap: 0.5rem; }
-input[type="text"] { flex: 1; min-width: 0; padding: 0.55rem 0.7rem; font: inherit; border: 1px solid var(--line); border-radius: 6px; }
-button { padding: 0.55rem 1.1rem; font: inherit; color: #fff; background: var(--accent); border: 0; border-radius: 6px; cursor: pointer; }
-button:disabled { opacity: 0.55; cursor: not-allowed; }
+/* The answer's cited sections, each a link to its passage. */
+.cites { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--s-3); margin: var(--s-3) 0 0; padding-top: var(--s-3); border-top: 1px solid var(--line); font-size: 0.875rem; line-height: 1.5; }
+.cites-label, .cites-note { color: var(--muted); }
+.cites a { padding-block: var(--s-1); }
 
-.loading { display: flex; align-items: center; gap: 0.5rem; color: var(--muted); }
+/* The question being asked, with the wait beside it. */
+.loading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-3); color: var(--muted); }
+.loading p { display: flex; align-items: center; gap: var(--s-2); margin: 0; }
+.waited { font-variant-numeric: tabular-nums; }
+.stop { min-height: 2.75rem; margin-left: auto; padding: 0 var(--s-2); color: var(--accent); background: none; border: 0; font-size: 0.875rem; text-decoration: underline 1px; text-underline-offset: 0.2em; }
 .spinner { width: 1rem; height: 1rem; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 
-.sources { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 0.75rem; }
+form { margin-top: var(--s-2); }
+label { display: block; margin-bottom: var(--s-2); color: var(--muted); font-size: 0.875rem; font-weight: 500; }
+/* One field with the button joined to its end. */
+.row { display: flex; }
+input[type="text"] { flex: 1; min-width: 0; height: 3rem; padding: 0 var(--s-4); font: inherit; color: var(--text); caret-color: var(--accent); background: var(--surface); border: 1px solid var(--field-line); border-right: 0; border-radius: 10px 0 0 10px; }
+input[type="text"]:focus-visible { position: relative; z-index: 1; outline-offset: -1px; }
+.row button { height: 3rem; padding: 0 var(--s-5); font-weight: 500; color: var(--button-text); background: var(--button); border: 1px solid var(--button); border-radius: 0 10px 10px 0; transition: background-color 0.15s ease-out; }
+.row button:hover:not(:disabled) { background: var(--button-hover); }
+/* Dimmed, not faded: a flat grey that still reads as the same control. */
+.row button:disabled { color: var(--disabled-text); background: var(--disabled-bg); border-color: var(--field-line); }
+.count { margin: var(--s-2) 0 0; color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.count.over { color: var(--limit); }
+
+/* Before the first question: one narrow centred column with room above it. There is no sources panel yet. */
+main.first-view { max-width: 40rem; padding-top: clamp(var(--s-7), 14vh, 8rem); padding-bottom: var(--s-8); }
+main.first-view h1 { font-size: clamp(2.25rem, 1.6rem + 2.6vw, 3rem); letter-spacing: -0.03em; margin-bottom: var(--s-3); }
+main.first-view .intro { margin-bottom: var(--s-6); }
+main.first-view form { margin-top: var(--s-7); }
+.layout.first-view { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "conversation" "composer" "about"; margin-top: 0; }
+.examples { margin-top: var(--s-7); }
+.examples h2 { margin: 0 0 var(--s-2); color: var(--muted); font-size: 0.875rem; font-weight: 500; }
+.examples ul { list-style: none; margin: 0; padding: 0; border-bottom: 1px solid var(--hairline); }
+.examples li { border-top: 1px solid var(--hairline); }
+/* Plain text rows: each reads as a question to pick, not a call to action. */
+.example { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); width: 100%; min-height: 3rem; padding: var(--s-3) 0; color: var(--text); background: none; border: 0; border-radius: 0; font-weight: 400; line-height: 1.4; text-align: left; }
+.example-text { text-decoration: underline 1px transparent; text-underline-offset: 0.25em; transition: text-decoration-color 0.15s ease-out; }
+.example-arrow { flex: none; color: var(--accent); opacity: 0; transform: translateX(-4px); transition: opacity 0.2s ease-out, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.example:hover:not(:disabled) .example-text, .example:focus-visible .example-text { text-decoration-color: currentColor; }
+.example:hover:not(:disabled) .example-arrow, .example:focus-visible .example-arrow { opacity: 1; transform: none; }
+.example:focus-visible { outline-offset: 3px; border-radius: 2px; }
+.example:disabled { color: var(--muted); }
+
+/* The panel stays in view while the conversation scrolls, and scrolls on its own, so passages are shown whole rather
+   than clipped one by one. The two "local" gradients cover the two shadows once there is nothing more to scroll that
+   way, so a shadow at the bottom edge means more text below. */
+.sources {
+  position: sticky; top: var(--s-4); max-height: calc(100vh - 2 * var(--s-4)); max-height: calc(100dvh - 2 * var(--s-4));
+  overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth;
+  border: 1px solid var(--rule); border-radius: 4px; color: var(--ink);
+  background:
+    linear-gradient(var(--paper-clear), var(--paper) 70%) center bottom / 100% 3rem no-repeat local,
+    radial-gradient(farthest-side at 50% 100%, rgb(var(--shadow) / 0.16), rgb(var(--shadow) / 0)) center bottom / 100% 0.75rem no-repeat scroll,
+    var(--paper);
+  box-shadow: 0 1px 2px rgb(var(--shadow) / 0.06), 0 12px 32px -20px rgb(var(--shadow) / 0.35);
+  scrollbar-width: thin; scrollbar-color: var(--rule) transparent;
+}
+.sources:focus-visible { outline-offset: 3px; }
+.sources-head { position: sticky; top: 0; z-index: 1; padding: var(--s-4) var(--s-5) var(--s-3); background: var(--paper); border-bottom: 1px solid var(--rule); }
+.sources-head h2 { margin: 0; font-size: 1rem; }
+/* The question is the visitor's own text and can be long: two lines keep the header short. */
+.sources-for { margin: var(--s-1) 0 0; color: var(--muted); font-size: 0.875rem; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 .sources ul { list-style: none; margin: 0; padding: 0; }
-.source { padding: 0.5rem 0; border-top: 1px solid var(--line); }
+.source { padding: var(--s-5); border-top: 1px solid var(--rule); scroll-margin-top: 5.5rem; }
 .source:first-child { border-top: 0; }
-.source-title { font-weight: 400; }
-.source .text { font-size: 0.9rem; max-height: 14rem; overflow-y: auto; }
+.source:focus { outline: none; }
+.source:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* The passage a link was followed to. A class rather than only :target, because the link scrolls the panel itself. */
+.source:target, .source.is-marked { background: var(--mark); animation: arrive 1.2s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes arrive { from { background-color: var(--mark-arrive); } }
+.source-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-2); }
+.source h3 { margin: 0; font-family: var(--serif); font-size: 1.0625rem; line-height: 1.35; }
+.source-label { font-style: italic; font-weight: 400; }
+.source-title { font-weight: 700; }
+.source-part { flex: none; color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.source .text { font-family: var(--serif); font-size: 0.96875rem; line-height: 1.6; max-width: 68ch; }
+
+.about { margin-top: var(--s-8); padding-top: var(--s-4); border-top: 1px solid var(--hairline); color: var(--muted); font-size: 0.875rem; }
+.about p { margin: 0; }
+.about p + p { margin-top: var(--s-1); }
+.about a { display: inline-block; padding-block: var(--s-1); }
+
+@media (max-width: 52rem) {
+  /* One column, in reading order: the conversation, the passages behind its latest answer, then the next question. */
+  .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "conversation" "sources" "composer" "about"; row-gap: var(--s-5); }
+  .layout.first-view { row-gap: 0; }
+  /* The panel follows the page instead of scrolling on its own. */
+  .sources { position: static; max-height: none; overflow: visible; }
+  .sources-head { position: static; }
+  .reply.answered, .source { padding: var(--s-4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner, .source:target, .source.is-marked { animation: none; }
+  .example-arrow, .back svg { transition: none; transform: none; }
+  .sources { scroll-behavior: auto; }
+}
