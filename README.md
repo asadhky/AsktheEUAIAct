@@ -1,8 +1,10 @@
 # Ask the EU AI Act
 
+*A personal side project to experiment with retrieval-augmented generation (RAG).*
+
 A small question-answering demo over the text of **Regulation (EU) 2024/1689 (the EU AI Act)** as published in the Official Journal on 12 July 2024. You ask a question in plain English; it retrieves the most relevant articles, recitals and annexes, asks an LLM to answer **only from those passages**, and shows the answer with the sections it cites. If the retrieved text does not cover the question, it says so instead of guessing.
 
-> **Not legal advice.** Answers are based on the original Official Journal text and do not reflect later amendments, including Regulation (EU) 2026/1744.
+> **Not legal advice.** Answers are based on the original Official Journal text and do not reflect later amendments.
 
 ![The chat page after the question "Which AI practices are prohibited?": the answer on the left, the passages of Article 5 it cites on the right](docs/answer.jpg)
 
@@ -35,7 +37,7 @@ flowchart TD
   VAL -.->|"no"| NC
 ```
 
-**Building the index.** This happens once, when the image is built (or with `python -m askact.ingest`), not when the app runs.
+**Building the index.** This happens once, when the image is built (or with `python -m askact.ingest`).
 
 ```mermaid
 flowchart LR
@@ -47,7 +49,6 @@ The evaluation harness (`python -m askact.evaluation.run`) calls the same retrie
 - The index is built **once, at image build time**, from the pinned source. The running app fetches nothing from EUR-Lex and downloads no models (`HF_HUB_OFFLINE=1`).
 - The backend keeps no conversation memory. The "chat" is a list of independent question-and-answer turns in the browser, so every citation maps to exactly one retrieval.
 - Citations the model invents (sections that were not retrieved) are dropped. An answer left with no valid citation is shown as "not covered".
-- The UI renders answers, sources and error messages as plain text, never as HTML or Markdown.
 
 ## Quick start (Docker)
 
